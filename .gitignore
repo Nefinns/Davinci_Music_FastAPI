@@ -10,6 +10,9 @@
 *.env
 *.pem
 
+# Plantilla pública de variables, sin valores reales
+!.env.example
+
 # ========================================
 # DESPLIEGUE (VERCEL)
 # ========================================
