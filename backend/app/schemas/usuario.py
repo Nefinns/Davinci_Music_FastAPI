@@ -56,4 +56,4 @@ class SolicitudRecuperacionContrasena(SQLModel):
 
 class RestablecerContrasena(SQLModel):
     token: str = Field(min_length = 1)
-    nueva_contrasena: str = Field(min_length = 8, max_length = 120)
+    nueva_contrasena: str = Field(min_length = 8, max_length = 128)
