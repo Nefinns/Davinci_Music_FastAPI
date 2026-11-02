@@ -1,129 +1,50 @@
-
-import jwt
-
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlmodel import Session, select
-from sqlalchemy import text
-
-from app.core.config import SECRET_KEY
-from app.core.security import ALGORITHM
+from fastapi import Depends, HTTPException
+from sqlmodel import Session
+from supertokens_python.recipe.session import SessionContainer
+from supertokens_python.recipe.session.framework.fastapi import verify_session
+from supertokens_python.recipe.userroles.asyncio import get_roles_for_user, get_permissions_for_role
+from supertokens_python.recipe.userroles.interfaces import GetPermissionsForRoleOkResult
+from app.core.config import TENANT_ID
+from app.core.identity import obtener_por_identidad
 from app.db.session import obtener_sesion
 from app.models.usuario import Usuario
 
-bearer_scheme = HTTPBearer(
-    auto_error=False,
-    scheme_name="JWT",
-)
+# Consulta Core para que logout/revocación invaliden también el access token.
+sesion_verificada = verify_session(check_database=True)
 
-
-def obtener_usuario_actual(
-    credenciales: HTTPAuthorizationCredentials | None = Depends(
-        bearer_scheme
-    ),
+async def obtener_usuario_actual(
+    autenticacion: SessionContainer = Depends(sesion_verificada),
     sesion: Session = Depends(obtener_sesion),
 ) -> Usuario:
-    credenciales_invalidas = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="No se pudo validar la autenticación.",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    if credenciales is None:
-        raise credenciales_invalidas
-
-    token = credenciales.credentials
-
-    try:
-        datos_token = jwt.decode(
-            token,
-            SECRET_KEY,
-            algorithms=[ALGORITHM],
-        )
-
-        id_usuario = datos_token.get("sub")
-        tipo_token = datos_token.get("tipo")
-
-        if not id_usuario or tipo_token != "acceso":
-            raise credenciales_invalidas
-
-        id_usuario = int(id_usuario)
-
-    except (jwt.InvalidTokenError, ValueError, TypeError) as error:
-        raise credenciales_invalidas from error
-
-    usuario = sesion.exec(
-        select(Usuario).where(Usuario.id_usuario == id_usuario)
-    ).first()
-
+    if autenticacion.get_tenant_id() != TENANT_ID:
+        raise HTTPException(403, "Tenant no permitido.")
+    usuario = obtener_por_identidad(sesion, autenticacion.get_user_id())
     if usuario is None or not usuario.activo:
-        raise credenciales_invalidas
-
+        raise HTTPException(403, "Cuenta no disponible o inactiva.")
     return usuario
 
+async def obtener_roles_usuario(usuario: Usuario = Depends(obtener_usuario_actual)) -> list[str]:
+    # Lectura actual en Core: una revocación de rol no espera al refresh del token.
+    return (await get_roles_for_user(TENANT_ID, usuario.identidad_externa)).roles
 
-def obtener_roles_usuario(
-    usuario: Usuario = Depends(obtener_usuario_actual),
-    sesion: Session = Depends(obtener_sesion),
-) -> list[str]:
-    roles = []
+async def obtener_permisos_usuario(roles: list[str] = Depends(obtener_roles_usuario)) -> list[str]:
+    permisos = set()
+    for rol in roles:
+        respuesta = await get_permissions_for_role(rol)
+        if isinstance(respuesta, GetPermissionsForRoleOkResult):
+            permisos.update(respuesta.permissions)
+    return sorted(permisos)
 
-    cliente_existe = sesion.execute(
-        text("""
-            SELECT EXISTS (
-                SELECT 1
-                FROM cliente
-                WHERE id_usuario = :id_usuario
-            )
-        """),
-        {"id_usuario": usuario.id_usuario},
-    ).scalar_one()
-
-    if cliente_existe:
-        roles.append("cliente")
-
-    maestro_activo = sesion.execute(
-        text("""
-            SELECT EXISTS (
-                SELECT 1
-                FROM maestro
-                WHERE id_usuario = :id_usuario
-                  AND activo = TRUE
-            )
-        """),
-        {"id_usuario": usuario.id_usuario},
-    ).scalar_one()
-
-    if maestro_activo:
-        roles.append("maestro")
-
-    administrador_existe = sesion.execute(
-        text("""
-            SELECT EXISTS (
-                SELECT 1
-                FROM administrador
-                WHERE id_usuario = :id_usuario
-            )
-        """),
-        {"id_usuario": usuario.id_usuario},
-    ).scalar_one()
-
-    if administrador_existe:
-        roles.append("administrador")
-
-    return roles
-
-
-def requerir_rol(*roles_permitidos: str):
-    def verificar_roles(
-        roles: list[str] = Depends(obtener_roles_usuario),
-    ) -> list[str]:
-        if not any(rol in roles for rol in roles_permitidos):
-            raise HTTPException(
-                status_code=403,
-                detail="No tienes permisos para realizar esta operación.",
-            )
-
+def requerir_rol(*permitidos: str):
+    async def verificar(roles: list[str] = Depends(obtener_roles_usuario)):
+        if not set(roles).intersection(permitidos):
+            raise HTTPException(403, "No tienes permisos para realizar esta operación.")
         return roles
+    return verificar
 
-    return verificar_roles
+def requerir_permiso(*requeridos: str):
+    async def verificar(permisos: list[str] = Depends(obtener_permisos_usuario)):
+        if not set(requeridos).issubset(permisos):
+            raise HTTPException(403, "No tienes permisos para realizar esta operación.")
+        return permisos
+    return verificar

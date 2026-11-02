@@ -1,11 +1,19 @@
+import { useEffect, useState } from "react"
+import { puedeAdministrar } from "@/services/usuarios"
 
 import { Link } from "react-router-dom"
 import { Music2, LogOut } from "lucide-react"
 import { useSesion } from "@/contexts/SesionContext"
 
 export default function Inicio() {
-  const { cerrarSesion } = useSesion()
+  const { cerrarSesion, error } = useSesion()
 
+  const [admin, setAdmin] = useState(false)
+  useEffect(() => {
+    let vigente = true
+    void puedeAdministrar().then(valor => { if (vigente) setAdmin(valor) }).catch(() => { if (vigente) setAdmin(false) })
+    return () => { vigente = false }
+  }, [])
   return (
     <main className="min-h-screen bg-ivory p-6 md:p-12">
       <header className="flex items-center justify-between gap-4">
@@ -24,6 +32,7 @@ export default function Inicio() {
           Cerrar sesión
         </button>
       </header>
+      {error && <p role="alert" className="mt-4 text-red-700">{error}</p>}
 
       <section className="mx-auto mt-20 max-w-3xl">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-patina">
@@ -36,6 +45,7 @@ export default function Inicio() {
           Tu acceso se ha completado. Aquí construiremos el espacio personal
           para las funciones de la tienda y la escuela de música.
         </p>
+        {admin && <Link to="/administracion/usuarios" className="mt-8 inline-block rounded-xl bg-patina px-5 py-3 text-white">Administrar usuarios y roles</Link>}
       </section>
     </main>
   )

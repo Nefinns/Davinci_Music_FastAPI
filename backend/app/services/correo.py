@@ -48,7 +48,7 @@ Para continuar, utiliza el siguiente enlace:
 
 {enlace}
 
-Este enlace expira en 15 minutos. Si no solicitaste este cambio,
+Este enlace es de un solo uso y tiene una vigencia limitada. Si no solicitaste este cambio,
 puedes ignorar este mensaje.
 
 Saludos,

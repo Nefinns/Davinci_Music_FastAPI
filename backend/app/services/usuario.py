@@ -1,152 +1,69 @@
-
+"""Adaptadores del perfil local; SuperTokens es el único proveedor de identidad."""
+import logging
+from fastapi import HTTPException
+from sqlalchemy import func, text
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
-
-import jwt
-from app.core.config import SECRET_KEY
+from supertokens_python.syncio import delete_user
+from supertokens_python.recipe.emailpassword.asyncio import sign_in
+from supertokens_python.recipe.emailpassword.syncio import sign_up
+from supertokens_python.recipe.emailpassword.interfaces import SignUpOkResult, SignInOkResult
+from supertokens_python.recipe.userroles.syncio import add_role_to_user
+from supertokens_python.recipe.userroles.interfaces import AddRoleToUserOkResult
+from app.core.config import TENANT_ID
+from app.core.identity import obtener_por_identidad
 from app.models.usuario import Usuario
 from app.schemas.usuario import UsuarioRegistro
-from app.core.security import (ALGORITHM, verificar_password, crear_token_acceso,
-                               hash_password, crear_token_recuperacion, verificar_token_recuperacion)
+
+logger = logging.getLogger(__name__)
 
 
-def registrar_usuario(
-    datos: UsuarioRegistro,
-    sesion: Session
-) -> Usuario:
-    campos_unicos = {
-        "nombre_usuario": datos.nombre_usuario,
-        "correo": datos.correo,
-        "curp": datos.curp,
-    }
+def buscar_por_correo(sesion: Session, correo: str):
+    resultados = sesion.exec(select(Usuario).where(func.lower(func.btrim(Usuario.correo)) == correo.strip().lower())).all()
+    if len(resultados) > 1:
+        raise HTTPException(409, "Existen cuentas duplicadas; requiere revisión administrativa.")
+    return resultados[0] if resultados else None
 
-    if datos.ine:
-        campos_unicos["ine"] = datos.ine
-
-    for campo, valor in campos_unicos.items():
-        columna = getattr(Usuario, campo)
-
-        usuario_existente = sesion.exec(
-            select(Usuario).where(columna == valor)
-        ).first()
-
-        if usuario_existente:
-            raise ValueError(
-                f"El campo {campo} ya está registrado."
-            )
-
-    datos_usuario = datos.model_dump(exclude={"contrasena"})
-    datos_usuario["contrasena_hash"] = hash_password(datos.contrasena)
-
-    nuevo_usuario = Usuario(**datos_usuario)
-
+def registrar_usuario(datos: UsuarioRegistro, sesion: Session) -> Usuario:
+    identidad = None
     try:
-        sesion.add(nuevo_usuario)
+        correo = str(datos.correo).strip().lower()
+        if buscar_por_correo(sesion, correo):
+            raise HTTPException(409, "No fue posible registrar esos datos.")
+        nuevo = Usuario(**datos.model_dump(exclude={"contrasena", "correo"}),
+                        correo=correo, contrasena_hash=None)
+        sesion.add(nuevo)
+        sesion.flush()  # Las restricciones SQL se validan antes de crear identidad.
+        respuesta = sign_up(TENANT_ID, correo, datos.contrasena)
+        if not isinstance(respuesta, SignUpOkResult):
+            raise HTTPException(409, "No fue posible registrar esos datos.")
+        identidad = respuesta.user.id
+        nuevo.identidad_externa = identidad
+        rol = add_role_to_user(TENANT_ID, identidad, "cliente")
+        if not isinstance(rol, AddRoleToUserOkResult):
+            raise RuntimeError("Rol cliente no inicializado")
+        sesion.execute(text("INSERT INTO cliente (id_usuario) VALUES (:id)"), {"id": nuevo.id_usuario})
         sesion.commit()
-        sesion.refresh(nuevo_usuario)
-        return nuevo_usuario
-
-    except IntegrityError as error:
+    except Exception as error:
         sesion.rollback()
-        raise ValueError(
-            "Alguno de los datos únicos ya está registrado."
-        ) from error
-
-    except Exception:
-        sesion.rollback()
+        if identidad:
+            try:
+                delete_user(identidad)
+            except Exception:
+                # No registrar correos, hashes, tokens ni detalles de SDK/SQL.
+                logger.error("Registro incompleto: revisar identidad huérfana en Core.")
+        if isinstance(error, IntegrityError):
+            raise HTTPException(409, "No fue posible registrar esos datos.") from None
         raise
+    # Una falla de lectura posterior al commit no debe eliminar la identidad.
+    sesion.refresh(nuevo)
+    return nuevo
 
-
-def autenticar_usuario(
-        correo: str,
-        contrasena: str,
-        sesion: Session,
-) -> str | None:
-    usuario = sesion.exec(
-        select(Usuario).where(
-            Usuario.correo == correo
-        )
-    ).first()
-
-    if not usuario:
-        return None
-
-    if not verificar_password(
-        contrasena,
-        usuario.contrasena_hash,
-    ):
-        return None
-
-    if not usuario.activo:
-        return None
-
-    return crear_token_acceso(usuario.id_usuario)
-
-
-def generar_token_recuperacion(correo: str, sesion: Session) -> str | None:
-    usuario = sesion.exec(
-        select(Usuario).where(
-            Usuario.correo == correo,
-            Usuario.activo == True
-        )
-    ).first()
-
-    if usuario is None:
-        return None
-
-    return crear_token_recuperacion(
-        usuario.id_usuario,
-        usuario.contrasena_hash
-    )
-
-
-def restablecer_contrasena(
-        token: str,
-        nueva_contrasena: str,
-        sesion: Session
-) -> bool:
-    try:
-        datos_token = jwt.decode(
-            token,
-            SECRET_KEY,
-            algorithms=[ALGORITHM]
-        )
-
-        if datos_token.get("tipo") != "recuperacion":
-            return False
-
-        id_usuario = datos_token.get("sub")
-
-        if not id_usuario:
-            return False
-
-        usuario = sesion.exec(
-            select(Usuario).where(
-                Usuario.id_usuario == int(id_usuario)
-            )
-        ).first()
-
-        if usuario is None or not usuario.activo:
-            return False
-
-        id_validado = verificar_token_recuperacion(
-            token,
-            usuario.contrasena_hash
-        )
-
-        if id_validado != usuario.id_usuario:
-            return False
-
-        usuario.contrasena_hash = hash_password(nueva_contrasena)
-
-        sesion.add(usuario)
-        sesion.commit()
-        sesion.refresh(usuario)
-
-        return True
-
-    except (jwt.InvalidTokenError, ValueError, TypeError):
-        return False
-    except Exception:
-        sesion.rollback()
-        raise
+async def autenticar_usuario(correo: str, contrasena: str, sesion: Session):
+    resultado = await sign_in(TENANT_ID, correo.strip().lower(), contrasena)
+    if not isinstance(resultado, SignInOkResult):
+        raise HTTPException(401, "Correo o contraseña incorrectos, o cuenta inactiva.")
+    usuario = obtener_por_identidad(sesion, resultado.user.id)
+    if usuario is None or not usuario.activo:
+        raise HTTPException(403, "Cuenta no disponible o inactiva.")
+    return resultado

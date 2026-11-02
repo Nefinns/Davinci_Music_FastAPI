@@ -1,165 +1,69 @@
-
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { useNavigate } from "react-router-dom"
-
-const CLAVE_TOKEN = "access_token"
-const TIEMPO_ADVERTENCIA = 5 * 60 * 1000
+import { Session } from "@/lib/supertokens"
+import { solicitar } from "@/services/auth"
 
 interface SesionContexto {
-  token: string | null
   autenticado: boolean
-  cerrarSesion: () => void
-  guardarSesion: (token: string) => void
+  cargando: boolean
+  error: string
+  cerrarSesion: () => Promise<void>
+  guardarSesion: () => Promise<void>
 }
-
 const ContextoSesion = createContext<SesionContexto | undefined>(undefined)
-
-function obtenerExpiracion(token: string): number | null {
-  try {
-    const parte = token.split(".")[1]
-    if (!parte) return null
-
-    const base64 = parte.replace(/-/g, "+").replace(/_/g, "/")
-    const datos = JSON.parse(atob(base64)) as { exp?: number }
-
-    return typeof datos.exp === "number" ? datos.exp * 1000 : null
-  } catch {
-    return null
-  }
-}
-
-function tokenValido(token: string | null): boolean {
-  if (!token) return false
-
-  const expiracion = obtenerExpiracion(token)
-  return expiracion !== null && expiracion > Date.now()
-}
 
 export function SesionProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
+  const [autenticado, setAutenticado] = useState(false)
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState("")
 
-  const [token, setToken] = useState<string | null>(() => {
-    const guardado = sessionStorage.getItem(CLAVE_TOKEN)
-    return tokenValido(guardado) ? guardado : null
-  })
-
-  const [mostrarAdvertencia, setMostrarAdvertencia] = useState(false)
-
-  const guardarSesion = useCallback((nuevoToken: string) => {
-    if (!tokenValido(nuevoToken)) {
-      throw new Error("El servidor devolvió un token inválido o vencido.")
-    }
-
-    sessionStorage.setItem(CLAVE_TOKEN, nuevoToken)
-    setToken(nuevoToken)
-    setMostrarAdvertencia(false)
+  const guardarSesion = useCallback(async () => {
+    if (!await Session.doesSessionExist()) throw new Error("No se pudo establecer la sesión.")
+    await solicitar("/usuarios/me", { metodo: "GET", requiereSesion: true })
+    setAutenticado(true)
+    setError("")
   }, [])
 
-  const cerrarSesion = useCallback(() => {
-    sessionStorage.removeItem(CLAVE_TOKEN)
-    setToken(null)
-    setMostrarAdvertencia(false)
-    navigate("/login", { replace: true })
+  const cerrarSesion = useCallback(async () => {
+    setError("")
+    try {
+      await Session.signOut()
+      setAutenticado(false)
+      navigate("/login", { replace: true })
+    } catch {
+      setError("No se pudo cerrar la sesión en el servidor. Vuelve a intentarlo.")
+    }
   }, [navigate])
 
   useEffect(() => {
-    if (!token) return
-
-    const expiracion = obtenerExpiracion(token)
-
-    if (expiracion === null || expiracion <= Date.now()) {
-      cerrarSesion()
-      return
-    }
-
-    const restante = expiracion - Date.now()
-    const hastaAdvertencia = restante - TIEMPO_ADVERTENCIA
-
-    const temporizadorAdvertencia =
-      hastaAdvertencia > 0
-        ? window.setTimeout(() => setMostrarAdvertencia(true), hastaAdvertencia)
-        : null
-
-    const temporizadorExpiracion = window.setTimeout(
-      cerrarSesion,
-      restante,
-    )
-
-    const comprobarExpiracion = () => {
-      if (document.visibilityState !== "visible") return
-
-      const tiempoRestante = expiracion - Date.now()
-
-      if (tiempoRestante <= 0) {
-        cerrarSesion()
-      } else if (tiempoRestante <= TIEMPO_ADVERTENCIA) {
-        setMostrarAdvertencia(true)
+    sessionStorage.removeItem("access_token")
+    let activo = true
+    const restaurar = async () => {
+      try {
+        const existe = await Session.doesSessionExist()
+        if (existe) await solicitar("/usuarios/me", { metodo: "GET", requiereSesion: true })
+        if (activo) { setAutenticado(existe); setError("") }
+      } catch {
+        if (activo) { setAutenticado(false); setError("No se pudo validar tu sesión. Inicia sesión nuevamente.") }
+      } finally {
+        if (activo) setCargando(false)
       }
     }
+    void restaurar()
+    const expirada = () => { setAutenticado(false); navigate("/login", { replace: true }) }
+    const visible = () => { if (document.visibilityState === "visible") void restaurar() }
+    window.addEventListener("sesion-expirada", expirada)
+    document.addEventListener("visibilitychange", visible)
+    return () => { activo = false; window.removeEventListener("sesion-expirada", expirada); document.removeEventListener("visibilitychange", visible) }
+  }, [navigate])
 
-    document.addEventListener("visibilitychange", comprobarExpiracion)
-
-    return () => {
-      if (temporizadorAdvertencia !== null) {
-        window.clearTimeout(temporizadorAdvertencia)
-      }
-
-      window.clearTimeout(temporizadorExpiracion)
-      document.removeEventListener("visibilitychange", comprobarExpiracion)
-    }
-  }, [token, cerrarSesion])
-
-  useEffect(() => {
-    if (!mostrarAdvertencia) return
-
-    window.alert(
-      "Tu sesión está por expirar. Guarda tu trabajo; tendrás que iniciar sesión nuevamente.",
-    )
-
-    setMostrarAdvertencia(false)
-  }, [mostrarAdvertencia])
-
-  useEffect(() => {
-    const manejarSesionExpirada = () => cerrarSesion()
-
-    window.addEventListener("sesion-expirada", manejarSesionExpirada)
-
-    return () => {
-      window.removeEventListener("sesion-expirada", manejarSesionExpirada)
-    }
-  }, [cerrarSesion])
-
-  const valor = useMemo(
-    () => ({
-      token,
-      autenticado: tokenValido(token),
-      cerrarSesion,
-      guardarSesion,
-    }),
-    [token, cerrarSesion, guardarSesion],
-  )
-
-  return (
-    <ContextoSesion.Provider value={valor}>
-      {children}
-    </ContextoSesion.Provider>
-  )
+  const valor = useMemo(() => ({ autenticado, cargando, error, cerrarSesion, guardarSesion }),
+    [autenticado, cargando, error, cerrarSesion, guardarSesion])
+  return <ContextoSesion.Provider value={valor}>{children}</ContextoSesion.Provider>
 }
-
 export function useSesion() {
   const contexto = useContext(ContextoSesion)
-
-  if (!contexto) {
-    throw new Error("useSesion debe utilizarse dentro de SesionProvider.")
-  }
-
+  if (!contexto) throw new Error("useSesion debe utilizarse dentro de SesionProvider.")
   return contexto
 }

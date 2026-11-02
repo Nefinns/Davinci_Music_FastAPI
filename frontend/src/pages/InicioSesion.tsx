@@ -21,9 +21,9 @@ export default function InicioSesion() {
     setCargando(true)
 
     try {
-      const respuesta = await iniciarSesion({ correo, contrasena })
+      await iniciarSesion({ correo, contrasena })
 
-      guardarSesion(respuesta.access_token)
+      await guardarSesion()
       navigate("/inicio", { replace: true })
     } catch (error) {
       setError(

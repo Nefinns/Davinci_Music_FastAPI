@@ -1,3 +1,4 @@
+import { PATRON_CURP, limitesNacimiento } from "@/lib/validaciones"
 
 import { useState, type FormEvent } from "react"
 import { Link, useNavigate } from "react-router-dom"
@@ -6,6 +7,7 @@ import { registrarUsuario } from "@/services/auth"
 
 export default function Registro() {
   const navigate = useNavigate()
+  const limites = limitesNacimiento()
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState("")
   const [exito, setExito] = useState("")
@@ -26,7 +28,7 @@ export default function Registro() {
   })
 
   function actualizar(campo: keyof typeof formulario, valor: string) {
-    setFormulario((actual) => ({ ...actual, [campo]: valor }))
+    setFormulario((actual) => ({ ...actual, [campo]: campo === "curp" ? valor.toUpperCase().replace(/[^A-Z0-9]/g, "") : valor }))
   }
 
   async function manejarEnvio(evento: FormEvent<HTMLFormElement>) {
@@ -44,6 +46,14 @@ export default function Registro() {
       return
     }
 
+    if (formulario.fecha_nacimiento < limites.min || formulario.fecha_nacimiento > limites.max) {
+      setError("La fecha de nacimiento debe estar entre hoy y hace 120 años.")
+      return
+    }
+    if (!/[A-Za-z]/.test(formulario.contrasena) || !/[0-9]/.test(formulario.contrasena)) {
+      setError("La contraseña debe incluir letras y números.")
+      return
+    }
     setCargando(true)
 
     try {
@@ -136,6 +146,9 @@ export default function Registro() {
                   type={tipo ?? "text"}
                   required={requerido}
                   maxLength={maxLength}
+                  min={campo === "fecha_nacimiento" ? limites.min : undefined}
+                  max={campo === "fecha_nacimiento" ? limites.max : undefined}
+                  pattern={campo === "curp" ? PATRON_CURP : undefined}
                   minLength={
                     campo === "nombre_usuario" ? 3 :
                     campo === "curp" ? 18 :

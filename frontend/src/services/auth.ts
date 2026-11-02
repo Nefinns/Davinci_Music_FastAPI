@@ -1,9 +1,5 @@
 
-const API_URL = (
-  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "")
-
-const CLAVE_TOKEN = "access_token"
+import { API_URL, Session } from "@/lib/supertokens"
 
 export interface UsuarioRegistro {
   nombre_usuario: string
@@ -24,10 +20,6 @@ export interface UsuarioLogin {
   contrasena: string
 }
 
-export interface TokenRespuesta {
-  access_token: string
-  token_type: string
-}
 
 export interface UsuarioRespuesta {
   id_usuario: number
@@ -110,30 +102,29 @@ export async function solicitar<T>(
     datos,
   } = opciones
 
-  const token = sessionStorage.getItem(CLAVE_TOKEN)
+  const existeSesion = requiereSesion ? await Session.doesSessionExist() : false
 
-  if (requiereSesion && !token) {
+  if (requiereSesion && !existeSesion) {
     window.dispatchEvent(new Event("sesion-expirada"))
     throw new Error("Tu sesión ha terminado. Inicia sesión nuevamente.")
   }
 
   const headers: Record<string, string> = {
     Accept: "application/json",
+    rid: "session",
   }
 
   if (datos !== undefined) {
     headers["Content-Type"] = "application/json"
   }
 
-  if (requiereSesion && token) {
-    headers.Authorization = `Bearer ${token}`
-  }
 
   let respuesta: Response
 
   try {
     respuesta = await fetch(`${API_URL}${endpoint}`, {
       method: metodo,
+      credentials: "include",
       headers,
       ...(datos !== undefined
         ? { body: JSON.stringify(datos) }
@@ -179,7 +170,7 @@ export async function solicitar<T>(
 }
 
 export function iniciarSesion(datos: UsuarioLogin) {
-  return solicitar<TokenRespuesta>("/auth/login", { datos })
+  return solicitar<{ mensaje: string }>("/auth/login", { datos })
 }
 
 export function registrarUsuario(datos: UsuarioRegistro) {

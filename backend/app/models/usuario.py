@@ -57,9 +57,7 @@ class Usuario(SQLModel, table=True):
         sa_column=Column(String(255), nullable=True)
     )
 
-    contrasena_hash: str = Field(
-        sa_column=Column(String(255), nullable=False)
-    )
+
 
     activo: bool = Field(
         default=True,
@@ -78,3 +76,6 @@ class Usuario(SQLModel, table=True):
             server_default=text("NOW()")
         )
     )
+
+    identidad_externa: Optional[str] = Field(default=None, sa_column=Column(String(128), nullable=True, unique=True))
+    contrasena_hash: Optional[str] = Field(default=None, sa_column=Column(String(255), nullable=True))
