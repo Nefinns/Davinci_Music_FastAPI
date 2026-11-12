@@ -18,7 +18,7 @@ CREATE TABLE usuario (
     correo             VARCHAR(150) NOT NULL UNIQUE,
     telefono           VARCHAR(20),                -- opcional
     direccion          VARCHAR(255),               -- opcional
-    contrasena_hash    VARCHAR(255) NOT NULL,
+    identidad_externa VARCHAR(128) UNIQUE, -- ID de usuario de SuperTokens
     activo             BOOLEAN NOT NULL DEFAULT TRUE,
     fecha_registro     TIMESTAMP NOT NULL DEFAULT NOW()
 );

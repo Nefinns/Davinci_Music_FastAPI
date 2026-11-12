@@ -31,7 +31,7 @@ def registrar_usuario(datos: UsuarioRegistro, sesion: Session) -> Usuario:
         if buscar_por_correo(sesion, correo):
             raise HTTPException(409, "No fue posible registrar esos datos.")
         nuevo = Usuario(**datos.model_dump(exclude={"contrasena", "correo"}),
-                        correo=correo, contrasena_hash=None)
+                        correo=correo)
         sesion.add(nuevo)
         sesion.flush()  # Las restricciones SQL se validan antes de crear identidad.
         respuesta = sign_up(TENANT_ID, correo, datos.contrasena)
