@@ -1,173 +1,113 @@
 # DaVinci Music
 
-Aplicación web en desarrollo para gestionar una academia de música y una tienda de instrumentos.
-
-El proyecto integra un backend con FastAPI, un frontend con React y TypeScript, y una base de datos PostgreSQL alojada en Neon. El avance actual se concentra en el registro de usuarios, la autenticación y la gestión de sesiones, como base para incorporar los módulos académicos y comerciales.
+Aplicación web en desarrollo para una tienda de instrumentos y una escuela de música. Utiliza FastAPI, React con TypeScript y PostgreSQL en Neon. La identidad, las credenciales y las sesiones se gestionan con SuperTokens.
 
 ## Estado del proyecto
 
-**En desarrollo activo. Sin despliegue público.**
+La rama `desarrollo_proyecto` contiene la aplicación principal. Las ramas de prácticas de Bases de Datos y el prototipo de categorías son trabajos separados; sus funciones no están integradas automáticamente en esta aplicación.
 
-La rama `desarrollo_proyecto` contiene el avance de la aplicación principal. Las otras ramas incluyen ejercicios y prototipos de la materia de Bases de Datos; no representan funcionalidades integradas en el producto.
+El código incluye:
 
-### Funcionalidades implementadas
+- Registro con validación de datos, creación del perfil en PostgreSQL y alta de identidad en SuperTokens.
+- Asignación inicial del rol `cliente` y creación del registro local correspondiente.
+- Inicio de sesión por correo y contraseña y sesiones mediante cookies.
+- Cierre de sesión mediante el SDK de SuperTokens.
+- Recuperación y restablecimiento de contraseña, con pantallas React y envío por SMTP SSL.
+- Consulta del perfil, roles y permisos del usuario autenticado.
+- Administración de roles con búsqueda y paginación de usuarios, confirmación de cambios y revocación de sesiones de la cuenta afectada.
+- Página pública y página de inicio protegida.
+- Comprobación de disponibilidad de la API y de conexión a PostgreSQL.
 
-- Registro de usuarios con validación de campos únicos.
-- Inicio de sesión mediante correo y contraseña.
-- Almacenamiento de contraseñas mediante hash Argon2.
-- Autenticación de la API mediante tokens JWT con expiración.
-- Consulta del perfil y los roles del usuario autenticado.
-- Dependencias de autorización por roles, como base para futuros módulos.
-- Página pública, formularios de registro e inicio de sesión y una página protegida.
-- Gestión de sesión en el frontend y cierre de sesión.
-- Endpoints de recuperación y restablecimiento de contraseña, con envío de correo mediante SMTP.
-- Endpoint de comprobación de conexión a la base de datos.
+La presencia de estas funciones en el código no sustituye las pruebas de integración contra los servicios configurados.
 
-La recuperación de contraseña está implementada en el backend. Su integración visual está pendiente: el enlace enviado por correo apunta a una ruta que todavía no está disponible en el frontend.
+Pendientes: edición del perfil, catálogo e inventario, ventas, abastecimiento, módulos académicos, reportes y despliegue. Las secciones públicas de tienda y escuela son informativas. Las tablas previstas para esos módulos no representan flujos terminados.
 
-### Funcionalidades previstas
-
-- Gestión académica de alumnos, docentes y clases.
-- Catálogo e inventario de instrumentos y productos.
-- Gestión de ventas y operaciones comerciales.
-- Interfaces administrativas con permisos por rol.
-- Integración completa del flujo de recuperación de contraseña.
-- Ampliación de pruebas automatizadas y preparación para despliegue.
-
-El esquema SQL contempla entidades de estos módulos. Su presencia en la base de datos no implica que sus interfaces o flujos de negocio estén implementados.
-
-## Tecnologías
+## Stack
 
 | Capa | Tecnologías |
 |---|---|
 | Backend | Python, FastAPI y Uvicorn |
-| Persistencia | PostgreSQL, Neon, SQLModel y SQLAlchemy |
-| Autenticación | PyJWT y pwdlib con Argon2 |
+| Persistencia | PostgreSQL en Neon, SQLModel, SQLAlchemy y psycopg2 |
+| Identidad y sesiones | SuperTokens Core, `supertokens_python` y `supertokens-web-js` |
 | Frontend | React, TypeScript, Vite y React Router |
-| Estilos e interfaz | Tailwind CSS, Base UI y Lucide |
-| Configuración | Variables de entorno y python-dotenv |
+| Interfaz | Tailwind CSS, componentes shadcn/ui configurados con Base UI y Lucide |
+| Correo | SMTP SSL mediante `smtplib` |
 
-## Organización del código
+Las dependencias están declaradas en `requirements.txt` y `frontend/package.json`; el frontend conserva su resolución en `frontend/package-lock.json`. Las versiones y auditorías deben verificarse en el entorno de instalación.
 
-```text
-backend/
-├── main.py
-└── app/
-    ├── api/routes/     # Endpoints de autenticación y usuarios
-    ├── core/           # Configuración, seguridad y permisos
-    ├── db/             # Conexión y sesiones de base de datos
-    ├── models/         # Modelos de persistencia
-    ├── schemas/        # Datos de entrada y salida
-    └── services/       # Lógica de usuarios y envío de correo
+## Identidad y modelo de datos
 
-frontend/
-├── src/
-│   ├── components/    # Componentes de interfaz
-│   ├── contexts/      # Estado de sesión
-│   ├── pages/         # Páginas de la aplicación
-│   ├── services/      # Comunicación con la API
-│   └── lib/           # Utilidades
-└── package-lock.json
+PostgreSQL conserva los datos del negocio en las 16 tablas canónicas. `usuario.id_usuario` sigue siendo la clave primaria local y las relaciones existentes conservan sus claves foráneas.
 
-DaVinciMusic_schema_canonico.sql
-requirements.txt
-```
+`usuario.identidad_externa` es un `VARCHAR(128) UNIQUE` que enlaza el perfil con el ID de usuario de SuperTokens. No contiene un token de sesión ni una contraseña. El esquema actualizado no incluye `contrasena_hash`; el modelo y el servicio de registro tampoco deben incluirlo.
 
-El backend separa las rutas HTTP, la lógica de negocio y el acceso a datos. El frontend consume la API y gestiona la navegación y el estado de sesión.
+La columna de identidad permite `NULL` porque el registro primero realiza un `flush` del perfil local para validar restricciones y después crea la identidad externa. Antes del `commit`, asigna la identidad y crea el cliente. Las operaciones protegidas exigen un perfil vinculado y activo. Si falla el registro, el servicio revierte la transacción local e intenta eliminar la identidad externa creada; una falla de esa compensación requiere revisión.
 
-## Entorno probado
+Las contraseñas recibidas en los formularios se envían a la API para su validación y uso con SuperTokens. No se guardan como campos del perfil local. SuperTokens administra sus credenciales; la aplicación no calcula ni verifica hashes propios.
 
-Validación local realizada el **25 de octubre de 2026**:
+Los roles `cliente`, `maestro` y `administrador`, y sus permisos de acceso, se consultan en SuperTokens. Asignar un rol no crea por sí solo un registro de maestro o administrador en PostgreSQL; la gestión de esas entidades se completará con los módulos del negocio. El registro público siempre asigna `cliente`.
 
-| Herramienta | Versión |
-|---|---|
-| Python | 3.13.17 |
-| pip | 26.2.2 |
-| Node.js | 22.23.4 |
-| npm | 10.9.9 |
+## Instalación local en Windows / PowerShell
 
-Las dependencias Python se declaran en `requirements.txt`. Las versiones resueltas del frontend se conservan en `frontend/package-lock.json`.
-
-## Instalación local
-
-Los siguientes comandos están preparados para Windows y PowerShell.
-
-### 1. Clonar la rama de desarrollo
+### 1. Obtener la aplicación y preparar Python
 
 ```powershell
 git clone --branch desarrollo_proyecto https://github.com/Nefinns/Davinci_Music_FastAPI.git
 cd Davinci_Music_FastAPI
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-### 2. Preparar Python
+Se utiliza directamente el intérprete del entorno virtual. Si ya tienes el proyecto, trabaja en tu copia de `desarrollo_proyecto` conservando tus cambios locales.
 
-Comprueba que `python` corresponde a la versión que deseas utilizar:
+### 2. Preparar PostgreSQL y SuperTokens
 
-```powershell
-python --version
-python -m venv venv
-.\venv\Scripts\python.exe -m pip install -r requirements.txt
-```
+Para una base vacía, ejecuta `DaVinciMusic_schema_canonico.sql` desde pgAdmin o el editor SQL de Neon. El archivo crea las 16 tablas dentro de una transacción. La API no crea las tablas al arrancar.
 
-Los comandos utilizan directamente el intérprete del entorno virtual, por lo que no es necesario activarlo.
+Para una base existente, no ejecutes de nuevo ese script: es un esquema inicial, no una migración. Si la identidad externa ya está incorporada y solo queda la columna del hash antiguo, primero aplica la limpieza del modelo y del servicio. La eliminación física de la columna es un paso separado; no requiere borrar usuarios ni recrear tablas.
 
-### 3. Preparar PostgreSQL
+Configura una instancia de SuperTokens Core accesible para el backend. Usa su URI y, para Core remoto, su API key. PostgreSQL del negocio y el almacenamiento administrado por Core tienen responsabilidades distintas.
 
-Crea una base de datos de desarrollo en PostgreSQL o Neon.
+### 3. Variables del backend
 
-Ejecuta `DaVinciMusic_schema_canonico.sql` sobre una base vacía, utilizando un cliente PostgreSQL o el editor SQL de Neon. El archivo crea el esquema inicial; no es un sistema de migraciones y no debe ejecutarse sobre una base existente sin revisar su contenido.
-
-La API no crea automáticamente las tablas al arrancar.
-
-### 4. Configurar el backend
-
-Crea un archivo `.env` en la raíz del proyecto:
+Crea `.env` en la raíz del repositorio, al mismo nivel que `backend` y `frontend`:
 
 ```dotenv
 DATABASE_URL=postgresql://USUARIO:CONTRASENA@HOST/BASE_DE_DATOS?sslmode=require
-SECRET_KEY=REEMPLAZAR_POR_UNA_CLAVE_ALEATORIA
-ACCESS_TOKEN_MINUTES=30
-```
+SUPERTOKENS_CONNECTION_URI=https://TU_INSTANCIA_DE_SUPERTOKENS
+SUPERTOKENS_API_KEY=REEMPLAZAR_POR_LA_CLAVE_DE_CORE
+API_DOMAIN=http://localhost:8000
+FRONTEND_URL=http://localhost:5173
 
-Utiliza la cadena de conexión correspondiente a tu base de datos. Puedes generar una clave para `SECRET_KEY` con:
-
-```powershell
-.\venv\Scripts\python.exe -c "import secrets; print(secrets.token_hex(32))"
-```
-
-Para habilitar el envío de correos de recuperación, añade:
-
-```dotenv
 SMTP_HOST=smtp.example.com
 SMTP_PORT=465
 SMTP_USER=usuario_smtp
 SMTP_PASSWORD=credencial_smtp
 SMTP_FROM=cuenta@example.com
-FRONTEND_URL=http://localhost:5173
 ```
 
-La implementación utiliza SMTP sobre SSL. Configura un proveedor y un puerto compatibles. El envío requiere credenciales válidas; la interfaz de restablecimiento sigue pendiente.
+Los valores son ejemplos. `DATABASE_URL` y `SUPERTOKENS_CONNECTION_URI` son obligatorios. Para Core remoto, la API key también es obligatoria. La configuración exige HTTPS para dominios que no sean locales. El tenant utilizado por la aplicación es `public`.
 
-No publiques el archivo `.env` ni utilices credenciales o datos personales reales en demostraciones públicas.
+El correo requiere un servidor compatible con SMTP SSL. Si el envío falla, la API mantiene una respuesta genérica para no revelar si una cuenta existe; comprueba la entrega real durante las pruebas.
 
-### 5. Iniciar la API
+`SECRET_KEY` y `ACCESS_TOKEN_MINUTES` de la implementación antigua ya no son utilizados por la configuración actual. La política de duración de sesiones debe verificarse en SuperTokens; el frontend no implementa actualmente el aviso previo de cinco minutos.
 
-Desde la raíz del proyecto:
+No publiques `.env` ni pongas secretos en variables `VITE_*`.
+
+### 4. Iniciar el backend
+
+Desde la raíz:
 
 ```powershell
 cd backend
-..\venv\Scripts\python.exe -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+..\.venv\Scripts\python.exe -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Direcciones locales:
+Accede a `http://localhost:8000`, `http://localhost:8000/docs` y `http://localhost:8000/db-test`. El inicio de la aplicación prepara los roles en Core, por lo que SuperTokens debe estar disponible.
 
-- API: http://127.0.0.1:8000
-- Documentación interactiva: http://127.0.0.1:8000/docs
-- Comprobación de conexión: http://127.0.0.1:8000/db-test
+### 5. Iniciar el frontend
 
-### 6. Iniciar el frontend
-
-En otra terminal, desde la raíz del proyecto:
+En otra terminal, desde la raíz:
 
 ```powershell
 cd frontend
@@ -175,81 +115,76 @@ npm ci
 npm run dev
 ```
 
-Abre la dirección que indique Vite, normalmente http://localhost:5173.
-
-El frontend utiliza `http://127.0.0.1:8000` como dirección predeterminada de la API. Para cambiarla, crea `frontend/.env.local`:
+El frontend utiliza `http://localhost:8000` de forma predeterminada. Puedes declararlo en `frontend/.env.local`:
 
 ```dotenv
-VITE_API_URL=http://127.0.0.1:8000
+VITE_API_URL=http://localhost:8000
 ```
 
-Las variables `VITE_*` son públicas para el navegador: no deben contener secretos.
+Abre `http://localhost:5173`. Mantén coherentes `API_DOMAIN`, `VITE_API_URL` y la dirección del navegador. El backend permite en CORS el origen exacto de `FRONTEND_URL`, con credenciales; cambia esa variable si usas otro origen o puerto. Evita mezclar `localhost` y `127.0.0.1` entre la configuración y el navegador.
 
-La configuración CORS del backend permite los orígenes locales `http://localhost:5173` y `http://127.0.0.1:5173`. Si cambias el puerto del frontend, ajusta también esa configuración.
-
-## Endpoints principales
+## API y sesiones
 
 | Método | Ruta | Función |
 |---|---|---|
-| GET | `/` | Comprobar que la API responde |
-| GET | `/db-test` | Comprobar la conexión a PostgreSQL |
-| POST | `/auth/registro` | Registrar un usuario |
-| POST | `/auth/login` | Obtener un token de acceso |
-| GET | `/usuarios/me` | Consultar el perfil autenticado |
-| GET | `/usuarios/me/roles` | Consultar los roles del usuario |
-| POST | `/auth/recuperar-contrasena` | Solicitar un correo de recuperación |
-| POST | `/auth/restablecer-contrasena` | Cambiar la contraseña con un token válido |
+| GET | `/` | Estado básico de la API |
+| GET | `/db-test` | Comprobación de PostgreSQL |
+| POST | `/auth/registro` | Crear identidad, perfil y cliente |
+| POST | `/auth/login` | Crear sesión mediante cookies |
+| POST | `/auth/logout` | Revocar la sesión actual desde el adaptador de la aplicación |
+| POST | `/auth/recuperar-contrasena` | Solicitar enlace por correo |
+| POST | `/auth/restablecer-contrasena` | Consumir token, revocar sesiones y cambiar contraseña |
+| GET | `/usuarios/me` | Consultar perfil |
+| GET | `/usuarios/me/roles` | Consultar roles actuales |
+| GET | `/usuarios/me/permisos` | Consultar permisos actuales |
+| GET | `/usuarios` | Buscar y paginar usuarios; requiere administración |
+| PUT | `/usuarios/{id_usuario}/roles/{rol}` | Asignar rol; requiere administración |
+| DELETE | `/usuarios/{id_usuario}/roles/{rol}` | Retirar rol; requiere administración |
 
-Los endpoints de perfil y roles requieren la cabecera:
+El frontend inicializa `supertokens-web-js`, envía peticiones con `credentials: "include"` y usa `Session.signOut()` para cerrar sesión mediante el endpoint gestionado por el SDK. Este flujo es distinto del adaptador `/auth/logout`, que también existe en la API.
+
+Las rutas personalizadas de `/auth` exigen `rid: session` y validan el origen cuando está presente. Las operaciones privadas verifican la sesión con Core y el perfil local activo. No se utiliza el antiguo contrato de devolver un JWT para guardarlo en `sessionStorage`; el frontend elimina esa clave antigua al iniciar.
+
+Los cambios de roles revocan las sesiones de la cuenta afectada. Un administrador no puede retirarse a sí mismo su rol administrativo desde esta API. La cuenta inicial con privilegios debe aprovisionarse de forma controlada en Core y estar vinculada a un perfil local activo; el repositorio no incluye un comando de bootstrap.
+
+## Organización
 
 ```text
-Authorization: Bearer <token>
+backend/
+  main.py
+  app/
+    api/routes/     # Autenticación y usuarios
+    core/           # Configuración, SuperTokens, identidad y permisos
+    db/             # Motor y sesiones SQLModel
+    models/         # Persistencia
+    schemas/        # Entrada y salida de la API
+    services/       # Registro, autenticación y correo
+frontend/
+  src/
+    components/
+    contexts/
+    pages/
+    services/
+    lib/
+DaVinciMusic_schema_canonico.sql
+requirements.txt
 ```
 
-Los formatos de solicitud y respuesta están disponibles en `/docs`.
-
-## Validación y mantenimiento
-
-Comprobaciones realizadas durante la actualización del entorno:
-
-- Instalación del frontend mediante `npm ci`.
-- Compilación de TypeScript y Vite mediante `npm run build`.
-- Comprobación de compatibilidad Python mediante `pip check`.
-- Auditorías de dependencias con `npm audit` y `pip-audit`, sin vulnerabilidades conocidas reportadas en las versiones analizadas.
-- Prueba manual de funcionamiento local después de actualizar Node.js y Python.
-
-Estos resultados corresponden a la fecha de revisión y no constituyen una garantía de ausencia de vulnerabilidades.
-
-Para repetir las comprobaciones básicas:
+## Verificación
 
 ```powershell
 # Desde la raíz
-.\venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -m pip check
 
 # Desde frontend
 npm run build
 npm run lint
-npm audit
 ```
 
-### Pendientes técnicos conocidos
+Pruebas de integración pendientes de repetir en el entorno configurado: registro y persistencia de identidad/cliente, login, consulta del perfil, logout y rechazo posterior de la sesión, recuperación por correo, rechazo de reutilización del enlace, control de roles y denegación a cuentas inactivas o sin vínculo.
 
-- Corregir cinco errores de lint relacionados con exportaciones para Fast Refresh y actualizaciones de estado dentro de efectos.
-- Completar la interfaz de recuperación de contraseña.
-- Ampliar las pruebas automatizadas de autenticación, autorización y flujos de negocio.
-- Automatizar las comprobaciones de calidad y dependencias.
-- Revisar la configuración y los controles de seguridad antes de un despliegue público.
+La revisión que acompaña la retirada del hash comprueba referencias en el código y sintaxis Python; no certifica entrega SMTP, disponibilidad de Core, ejecución PostgreSQL ni una compilación nueva del frontend. El repositorio revisado no contiene una suite automatizada de pruebas. Las auditorías históricas de dependencias no representan una evaluación de seguridad actual.
 
-## Ramas académicas
+## Próximo desarrollo
 
-Además de la aplicación principal, el repositorio conserva ejercicios de Bases de Datos:
-
-| Rama | Propósito |
-|---|---|
-| `desarrollo_proyecto` | Aplicación principal |
-| `main` | Versión inicial del ejercicio CRUD |
-| `prueba-crud-categoria-instrumento` | Prototipo CRUD de categorías de instrumentos |
-| `actividades_3.3_3.4` | Ejercicios DDL/DCL con interfaz de escritorio |
-| `bd_experimental_unidad4` | Panel experimental de administración de bases de datos |
-
-Los ejercicios administrativos deben utilizarse únicamente con bases de prácticas y dentro del alcance documentado en cada rama. No forman parte del backend de la aplicación principal.
+Completar RF-05 (edición de perfil) y después RF-08–19 (categorías e instrumentos). Mantener permisos comprobados en el backend, integridad de datos y mensajes claros. Antes de ventas y escuela, completar las entidades locales de administrador y maestro y sus reglas de negocio.
