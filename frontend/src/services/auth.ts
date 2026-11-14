@@ -5,6 +5,16 @@ import {
   mensajeFalloSolicitud,
 } from "@/lib/erroresSesion"
 
+export class ErrorSolicitud extends Error {
+  readonly estado: number
+
+  constructor(mensaje: string, estado: number) {
+    super(mensaje)
+    this.name = "ErrorSolicitud"
+    this.estado = estado
+  }
+}
+
 export interface UsuarioRegistro {
   nombre_usuario: string
   nombre: string
@@ -122,7 +132,10 @@ export async function solicitar<T>(
 
   if (requiereSesion && !existeSesion) {
     window.dispatchEvent(new Event("sesion-expirada"))
-    throw new Error("Tu sesión ha terminado. Inicia sesión nuevamente.")
+    throw new ErrorSolicitud(
+      "Tu sesión ha terminado. Inicia sesión nuevamente.",
+      401,
+    )
   }
 
   const headers: Record<string, string> = {
@@ -154,13 +167,6 @@ export async function solicitar<T>(
     throw new Error(mensajeFalloSolicitud(error), { cause: error })
   }
 
-  if (respuesta.status === 401 && requiereSesion) {
-    window.dispatchEvent(new Event("sesion-expirada"))
-    throw new Error(
-      "Tu sesión ha expirado. Inicia sesión nuevamente.",
-    )
-  }
-
   const contenido = await respuesta.text()
   let resultado: unknown = null
 
@@ -173,7 +179,14 @@ export async function solicitar<T>(
   }
 
   if (!respuesta.ok) {
-    throw new Error(obtenerMensajeError(resultado, respuesta.status))
+    if (respuesta.status === 401 && requiereSesion) {
+      window.dispatchEvent(new Event("sesion-expirada"))
+    }
+
+    throw new ErrorSolicitud(
+      obtenerMensajeError(resultado, respuesta.status),
+      respuesta.status,
+    )
   }
 
   if (!contenido) {

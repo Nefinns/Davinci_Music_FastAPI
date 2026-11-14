@@ -42,18 +42,19 @@ export default function CompletarPerfilGoogle() {
     setCargando(true)
 
     try {
-      await completarRegistroGoogle({
-        ...datos,
-        nombre_usuario: datos.nombre_usuario.trim(),
-        nombre: datos.nombre.trim(),
-        apellido_paterno: datos.apellido_paterno.trim(),
-        curp: datos.curp.trim(),
-        apellido_materno: datos.apellido_materno?.trim() || null,
-        ine: datos.ine?.trim() || null,
-        telefono: datos.telefono?.trim() || null,
-        direccion: datos.direccion?.trim() || null,
-      })
-      const estado = await guardarSesion()
+      const estado = await guardarSesion(() =>
+        completarRegistroGoogle({
+          ...datos,
+          nombre_usuario: datos.nombre_usuario.trim(),
+          nombre: datos.nombre.trim(),
+          apellido_paterno: datos.apellido_paterno.trim(),
+          curp: datos.curp.trim(),
+          apellido_materno: datos.apellido_materno?.trim() || null,
+          ine: datos.ine?.trim() || null,
+          telefono: datos.telefono?.trim() || null,
+          direccion: datos.direccion?.trim() || null,
+        }),
+      )
       if (estado.estado !== "completo") {
         throw new Error("El perfil aún no está listo. Inténtalo nuevamente.")
       }
@@ -86,16 +87,16 @@ export default function CompletarPerfilGoogle() {
     tipo?: string
     maxLength: number
   }[] = [
-    { nombre: "nombre_usuario", etiqueta: "Nombre de usuario", obligatorio: true, maxLength: 100 },
-    { nombre: "nombre", etiqueta: "Nombre", obligatorio: true, maxLength: 100 },
-    { nombre: "apellido_paterno", etiqueta: "Apellido paterno", obligatorio: true, maxLength: 100 },
-    { nombre: "apellido_materno", etiqueta: "Apellido materno", maxLength: 100 },
-    { nombre: "fecha_nacimiento", etiqueta: "Fecha de nacimiento", obligatorio: true, tipo: "date", maxLength: 10 },
-    { nombre: "curp", etiqueta: "CURP", obligatorio: true, maxLength: 18 },
-    { nombre: "ine", etiqueta: "INE", maxLength: 20 },
-    { nombre: "telefono", etiqueta: "Teléfono", tipo: "tel", maxLength: 20 },
-    { nombre: "direccion", etiqueta: "Dirección", maxLength: 255 },
-  ]
+      { nombre: "nombre_usuario", etiqueta: "Nombre de usuario", obligatorio: true, maxLength: 100 },
+      { nombre: "nombre", etiqueta: "Nombre", obligatorio: true, maxLength: 100 },
+      { nombre: "apellido_paterno", etiqueta: "Apellido paterno", obligatorio: true, maxLength: 100 },
+      { nombre: "apellido_materno", etiqueta: "Apellido materno", maxLength: 100 },
+      { nombre: "fecha_nacimiento", etiqueta: "Fecha de nacimiento", obligatorio: true, tipo: "date", maxLength: 10 },
+      { nombre: "curp", etiqueta: "CURP", obligatorio: true, maxLength: 18 },
+      { nombre: "ine", etiqueta: "INE", maxLength: 20 },
+      { nombre: "telefono", etiqueta: "Teléfono", tipo: "tel", maxLength: 20 },
+      { nombre: "direccion", etiqueta: "Dirección", maxLength: 255 },
+    ]
 
   return (
     <main className="min-h-screen bg-ivory p-6 md:p-12">
@@ -104,24 +105,94 @@ export default function CompletarPerfilGoogle() {
         <p className="mt-3 text-secondary">
           Necesitamos estos datos cuando quieras comprar o inscribirte.
         </p>
+        <p className="mt-3 text-sm text-secondary">
+          Los campos con * son obligatorios. Los demás son opcionales.
+        </p>
         <form onSubmit={enviar} className="mt-8 grid gap-5 sm:grid-cols-2">
-          {campos.map(({ nombre, etiqueta, obligatorio, tipo, maxLength }) => (
-            <label key={nombre} className="block text-sm font-semibold">
-              {etiqueta}
-              <input
-                type={tipo || "text"}
-                required={obligatorio}
-                minLength={nombre === "nombre_usuario" ? 3 : nombre === "curp" ? 18 : undefined}
-                maxLength={maxLength}
-                min={nombre === "fecha_nacimiento" ? limites.min : undefined}
-                max={nombre === "fecha_nacimiento" ? limites.max : undefined}
-                pattern={nombre === "curp" ? PATRON_CURP : undefined}
-                value={datos[nombre] ?? ""}
-                onChange={(evento) => cambiar(nombre, evento.target.value)}
-                className="mt-2 w-full rounded-xl border border-ebony/15 px-4 py-3"
-              />
-            </label>
-          ))}
+          {campos.map(
+            ({ nombre, etiqueta, obligatorio, tipo, maxLength }) => (
+              <label
+                key={nombre}
+                className="block text-sm font-semibold"
+              >
+                {etiqueta}
+
+                {obligatorio ? (
+                  <span className="ml-1 text-patina">
+                    * (obligatorio)
+                  </span>
+                ) : (
+                  <span className="ml-1 font-normal text-secondary">
+                    (opcional)
+                  </span>
+                )}
+
+                <input
+                  id={nombre}
+                  type={tipo || "text"}
+                  required={obligatorio}
+                  minLength={
+                    nombre === "nombre_usuario"
+                      ? 3
+                      : nombre === "curp"
+                        ? 18
+                        : undefined
+                  }
+                  maxLength={maxLength}
+                  min={
+                    nombre === "fecha_nacimiento"
+                      ? limites.min
+                      : undefined
+                  }
+                  max={
+                    nombre === "fecha_nacimiento"
+                      ? limites.max
+                      : undefined
+                  }
+                  pattern={
+                    nombre === "curp" ? PATRON_CURP : undefined
+                  }
+                  aria-describedby={
+                    nombre === "curp" ? "ayuda-curp" : undefined
+                  }
+                  title={
+                    nombre === "curp"
+                      ? "Copia los 18 caracteres de tu CURP, sin espacios, tal como aparecen en tu constancia."
+                      : undefined
+                  }
+                  value={datos[nombre] ?? ""}
+                  onInvalid={(evento) => {
+                    if (
+                      nombre === "curp" &&
+                      evento.currentTarget.validity.patternMismatch
+                    ) {
+                      evento.currentTarget.setCustomValidity(
+                        "La CURP no coincide con el formato esperado. Copia los 18 caracteres de tu constancia y consulta la ayuda bajo el campo.",
+                      )
+                    }
+                  }}
+                  onChange={(evento) => {
+                    evento.currentTarget.setCustomValidity("")
+                    cambiar(nombre, evento.target.value)
+                  }}
+                  className="mt-2 w-full rounded-xl border border-ebony/15 px-4 py-3"
+                />
+
+                {nombre === "curp" && (
+                  <span
+                    id="ayuda-curp"
+                    className="mt-2 block text-xs font-normal leading-5 text-secondary"
+                  >
+                    Copia tu CURP de la constancia, sin espacios. El formato
+                    esperado es: 4 letras (la segunda es vocal o X),
+                    6 dígitos de nacimiento (AAMMDD), H o M, 5 letras,
+                    un carácter alfanumérico y un dígito. Las letras se
+                    convierten a mayúsculas automáticamente.
+                  </span>
+                )}
+              </label>
+            ),
+          )}
           {error && <p role="alert" className="text-red-700 sm:col-span-2">{error}</p>}
           <div className="flex items-center gap-4 sm:col-span-2">
             <button disabled={cargando} className="rounded-xl bg-patina px-5 py-3 text-white disabled:opacity-60">

@@ -94,11 +94,8 @@ def completar_registro_google(
         if existente:
             if not existente.activo:
                 raise HTTPException(403, "Cuenta no disponible o inactiva.")
-            # Hace seguro reintentar la petición después de perder la respuesta.
-            rol = add_role_to_user(TENANT_ID, identidad, "cliente")
-            if not isinstance(rol, AddRoleToUserOkResult):
-                raise HTTPException(
-                    503, "No se pudo verificar el rol de cliente.")
+
+    # Reintentar devuelve el perfil sin alterar los roles actuales.
             return existente
 
         # Un correo perteneciente a otro perfil requiere vinculación de
@@ -139,6 +136,7 @@ def completar_registro_google(
 
     sesion.refresh(nuevo)
     return nuevo
+
 
 async def autenticar_usuario(correo: str, contrasena: str, sesion: Session):
     resultado = await sign_in(TENANT_ID, correo.strip().lower(), contrasena)

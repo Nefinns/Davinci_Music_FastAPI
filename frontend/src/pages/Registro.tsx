@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { ArrowLeft, Music2 } from "lucide-react"
 import { registrarUsuario } from "@/services/auth"
-import { comenzarAccesoGoogle } from "@/services/google"
+import BotonGoogle from "@/components/BotonGoogle"
 
 export default function Registro() {
   const navigate = useNavigate()
@@ -126,18 +126,11 @@ export default function Registro() {
             Completa tus datos para formar parte de nuestra comunidad musical.
           </p>
         </header>
-        <button
-          type="button"
-          onClick={() => {
-            setError("")
-            void comenzarAccesoGoogle().catch((err) =>
-              setError(err instanceof Error ? err.message : "No se pudo abrir Google."),
-            )
-          }}
-          className="mb-5 w-full rounded-xl border border-ebony/20 bg-white px-5 py-3.5 font-semibold hover:border-patina"
-        >
-          Continuar con Google
-        </button>
+        <BotonGoogle
+          className="mb-5"
+          disabled={cargando}
+          onProcesando={setCargando}
+        />
 
         <form onSubmit={manejarEnvio} className="rounded-2xl border border-ebony/10 bg-white p-6 shadow-sm md:p-9">
           <h2 className="mb-5 text-xs font-bold uppercase tracking-[0.2em] text-patina">

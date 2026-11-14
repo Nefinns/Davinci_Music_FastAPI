@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends, Request, HTTPException
 from starlette.concurrency import run_in_threadpool
-from sqlmodel import Session
+from sqlmodel import Session, select
 from supertokens_python.recipe.session.asyncio import create_new_session, revoke_all_sessions_for_user
 from supertokens_python.recipe.session import SessionContainer
 from supertokens_python.recipe.emailpassword.asyncio import (
@@ -22,7 +22,6 @@ from app.services.usuario import registrar_usuario, autenticar_usuario, buscar_p
 from app.services.correo import enviar_correo_recuperacion
 
 from supertokens_python.asyncio import get_user
-from sqlalchemy import select
 from app.schemas.usuario import UsuarioRegistroGoogle
 from app.services.usuario import completar_registro_google
 
@@ -32,8 +31,7 @@ logger = logging.getLogger(__name__)
 async def verificar_origen(request: Request):
     if request.headers.get("origin") not in {None, FRONTEND_URL}:
         raise HTTPException(403, "Origen no permitido.")
-    if request.headers.get("rid") != "session":
-        raise HTTPException(403, "Falta el encabezado de sesión.")
+    
 
 router = APIRouter(
     prefix="/auth", tags=["Autenticación"], dependencies=[Depends(verificar_origen)])

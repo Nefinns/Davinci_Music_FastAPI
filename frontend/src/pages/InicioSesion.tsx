@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom"
 import { ArrowLeft, Eye, EyeOff, Music2 } from "lucide-react"
 import { iniciarSesion } from "@/services/auth"
 import { useSesion } from "@/contexts/SesionContext"
-import { comenzarAccesoGoogle } from "@/services/google"
+import BotonGoogle from "@/components/BotonGoogle"
 
 export default function InicioSesion() {
   const navigate = useNavigate()
@@ -22,9 +22,16 @@ export default function InicioSesion() {
     setCargando(true)
 
     try {
-      await iniciarSesion({ correo, contrasena })
+      const estado = await guardarSesion(
+        () => iniciarSesion({ correo, contrasena }),
+      )
 
-      await guardarSesion()
+      if (estado.estado !== "completo") {
+        throw new Error(
+          "No se encontró el perfil completo de esta cuenta.",
+        )
+      }
+
       navigate("/inicio", { replace: true })
     } catch (error) {
       setError(
@@ -160,18 +167,11 @@ export default function InicioSesion() {
               {cargando ? "Ingresando..." : "Iniciar sesión"}
             </button>
           </form>
-          <button
-            type="button"
-            onClick={() => {
-              setError("")
-              void comenzarAccesoGoogle().catch((err) =>
-                setError(err instanceof Error ? err.message : "No se pudo abrir Google."),
-              )
-            }}
-            className="mt-4 w-full rounded-xl border border-ebony/20 bg-white px-5 py-3.5 font-semibold hover:border-patina"
-          >
-            Continuar con Google
-          </button>
+          <BotonGoogle
+            className="mt-4"
+            disabled={cargando}
+            onProcesando={setCargando}
+          />
 
           <p className="mt-7 text-center text-sm text-secondary">
             ¿Todavía no tienes cuenta?{" "}
