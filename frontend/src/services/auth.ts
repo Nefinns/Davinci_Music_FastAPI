@@ -1,5 +1,9 @@
 
 import { API_URL, Session } from "@/lib/supertokens"
+import {
+  esLimiteRenovacion,
+  mensajeFalloSolicitud,
+} from "@/lib/erroresSesion"
 
 export interface UsuarioRegistro {
   nombre_usuario: string
@@ -49,8 +53,8 @@ function obtenerMensajeError(
 ): string {
   const detalle =
     typeof resultado === "object" &&
-    resultado !== null &&
-    "detail" in resultado
+      resultado !== null &&
+      "detail" in resultado
       ? (resultado as { detail: unknown }).detail
       : null
 
@@ -62,8 +66,8 @@ function obtenerMensajeError(
     return detalle
       .map((error) =>
         typeof error === "object" &&
-        error !== null &&
-        "msg" in error
+          error !== null &&
+          "msg" in error
           ? String(error.msg)
           : "Hay un dato inválido.",
       )
@@ -102,7 +106,19 @@ export async function solicitar<T>(
     datos,
   } = opciones
 
-  const existeSesion = requiereSesion ? await Session.doesSessionExist() : false
+  let existeSesion = false
+
+  try {
+    existeSesion = requiereSesion
+      ? await Session.doesSessionExist()
+      : false
+  } catch (error) {
+    if (esLimiteRenovacion(error)) {
+      window.dispatchEvent(new Event("sesion-expirada"))
+    }
+
+    throw new Error(mensajeFalloSolicitud(error))
+  }
 
   if (requiereSesion && !existeSesion) {
     window.dispatchEvent(new Event("sesion-expirada"))
@@ -130,10 +146,12 @@ export async function solicitar<T>(
         ? { body: JSON.stringify(datos) }
         : {}),
     })
-  } catch {
-    throw new Error(
-      "No se pudo conectar con el servidor. Comprueba que la API esté ejecutándose.",
-    )
+  } catch (error) {
+    if (esLimiteRenovacion(error)) {
+      window.dispatchEvent(new Event("sesion-expirada"))
+    }
+
+    throw new Error(mensajeFalloSolicitud(error))
   }
 
   if (respuesta.status === 401 && requiereSesion) {
