@@ -106,7 +106,7 @@ export async function solicitar<T>(
     datos,
   } = opciones
 
-  let existeSesion = false
+  let existeSesion: boolean
 
   try {
     existeSesion = requiereSesion
@@ -117,7 +117,7 @@ export async function solicitar<T>(
       window.dispatchEvent(new Event("sesion-expirada"))
     }
 
-    throw new Error(mensajeFalloSolicitud(error))
+    throw new Error(mensajeFalloSolicitud(error), { cause: error })
   }
 
   if (requiereSesion && !existeSesion) {
@@ -151,7 +151,7 @@ export async function solicitar<T>(
       window.dispatchEvent(new Event("sesion-expirada"))
     }
 
-    throw new Error(mensajeFalloSolicitud(error))
+    throw new Error(mensajeFalloSolicitud(error), { cause: error })
   }
 
   if (respuesta.status === 401 && requiereSesion) {

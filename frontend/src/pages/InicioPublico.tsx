@@ -1,4 +1,3 @@
-
 import { Link } from "react-router-dom"
 import {
   ArrowRight,
@@ -8,7 +7,9 @@ import {
   Headphones,
   Music,
   BookOpen,
+  LogOut,
 } from "lucide-react"
+import { useSesion } from "@/contexts/SesionContext"
 
 const opciones = [
   {
@@ -32,6 +33,20 @@ const opciones = [
 ]
 
 export default function InicioPublico() {
+  const { autenticado, cargando, estadoPerfil, cerrarSesion, error } =
+    useSesion()
+
+  const perfilPendiente =
+    autenticado && estadoPerfil?.estado === "pendiente"
+
+  const destinoCuenta = autenticado
+    ? perfilPendiente
+      ? "#tienda"
+      : "/inicio"
+    : "/registro"
+  const destinoTienda = autenticado ? "#tienda" : "/registro"
+  const destinoEscuela = autenticado ? "#escuela" : "/registro"
+
   return (
     <main className="min-h-screen bg-ivory text-ebony">
       <header className="border-b border-ebony/10">
@@ -64,22 +79,67 @@ export default function InicioPublico() {
           </nav>
 
           <div className="flex shrink-0 items-center gap-2">
-            <Link
-              to="/login"
-              className="hidden rounded-full px-4 py-2 text-sm font-semibold transition hover:bg-black/5 sm:inline-flex"
-            >
-              Iniciar sesión
-            </Link>
-            <Link
-              to="/registro"
-              className="inline-flex items-center gap-2 rounded-full bg-patina px-4 py-3 text-sm font-semibold text-white transition hover:bg-sidebar"
-            >
-              Crear cuenta
-              <ArrowRight size={16} />
-            </Link>
+            {!cargando &&
+              (autenticado ? (
+                <>
+                  <Link
+                    to={perfilPendiente ? "/completar-perfil" : "/inicio"}
+                    className="hidden rounded-full px-4 py-2 text-sm font-semibold transition hover:bg-black/5 sm:inline-flex"
+                  >
+                    {perfilPendiente ? "Completar perfil" : "Mi cuenta"}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => void cerrarSesion()}
+                    className="inline-flex items-center gap-2 rounded-full border border-ebony/15 px-4 py-3 text-sm font-semibold transition hover:border-patina hover:text-patina"
+                  >
+                    <LogOut size={16} />
+                    <span className="hidden sm:inline">Cerrar sesión</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="hidden rounded-full px-4 py-2 text-sm font-semibold transition hover:bg-black/5 sm:inline-flex"
+                  >
+                    Iniciar sesión
+                  </Link>
+                  <Link
+                    to="/registro"
+                    className="inline-flex items-center gap-2 rounded-full bg-patina px-4 py-3 text-sm font-semibold text-white transition hover:bg-sidebar"
+                  >
+                    Crear cuenta
+                    <ArrowRight size={16} />
+                  </Link>
+                </>
+              ))}
           </div>
         </div>
       </header>
+
+      {error && (
+        <p role="alert" className="mx-auto max-w-7xl px-6 py-3 text-red-700 lg:px-10">
+          {error}
+        </p>
+      )}
+
+      {perfilPendiente && (
+        <div className="border-b border-brass/30 bg-brass/10">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-4 text-sm lg:px-10">
+            <p>
+              Ya puedes explorar DaVinciMusic. Para comprar o inscribirte a
+              clases, necesitaremos que completes tu perfil.
+            </p>
+            <Link
+              to="/completar-perfil"
+              className="font-semibold text-patina underline underline-offset-4"
+            >
+              Completar mi perfil
+            </Link>
+          </div>
+        </div>
+      )}
 
       <section className="relative overflow-hidden bg-sidebar text-white">
         <div className="pointer-events-none absolute -right-20 -top-24 h-80 w-80 rounded-full border border-brass/20" />
@@ -103,10 +163,10 @@ export default function InicioPublico() {
 
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
-                to="/registro"
+                to={destinoTienda}
                 className="inline-flex items-center gap-2 rounded-full bg-brass px-6 py-3.5 font-semibold text-ebony transition hover:bg-[#d8b45f]"
               >
-                Comenzar ahora
+                {autenticado ? "Explorar la tienda" : "Comenzar ahora"}
                 <ArrowRight size={18} />
               </Link>
 
@@ -207,10 +267,10 @@ export default function InicioPublico() {
               <p className="mt-3 leading-7 text-secondary">{descripcion}</p>
 
               <Link
-                to="/registro"
+                to={destinoCuenta}
                 className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-patina hover:text-sidebar"
               >
-                Explorar
+                {autenticado ? "Mi espacio" : "Explorar"}
                 <ArrowRight size={16} />
               </Link>
             </article>
@@ -245,10 +305,10 @@ export default function InicioPublico() {
             </p>
 
             <Link
-              to="/registro"
+              to={destinoEscuela}
               className="mt-7 inline-flex items-center gap-2 rounded-full bg-patina px-6 py-3 font-semibold text-white transition hover:bg-sidebar"
             >
-              Únete a la comunidad
+              {autenticado ? "Explorar la escuela" : "Únete a la comunidad"}
               <ArrowRight size={17} />
             </Link>
           </div>
@@ -273,10 +333,10 @@ export default function InicioPublico() {
           </p>
 
           <Link
-            to="/registro"
+            to={destinoCuenta}
             className="mt-8 inline-flex items-center gap-2 font-semibold text-patina hover:text-sidebar"
           >
-            Forma parte de DaVinciMusic
+            {autenticado ? "Ir a mi espacio" : "Forma parte de DaVinciMusic"}
             <ArrowRight size={17} />
           </Link>
         </div>
@@ -299,14 +359,36 @@ export default function InicioPublico() {
             reservados.
           </p>
 
-          <div className="flex gap-5 text-sm">
-            <Link to="/login" className="text-white/70 transition hover:text-brass">
-              Iniciar sesión
-            </Link>
-            <Link to="/registro" className="text-white/70 transition hover:text-brass">
-              Crear cuenta
-            </Link>
-          </div>
+          {!cargando && (
+            <div className="flex gap-5 text-sm">
+              {autenticado ? (
+                <>
+                  <Link
+                    to={perfilPendiente ? "/completar-perfil" : "/inicio"}
+                    className="text-white/70 transition hover:text-brass"
+                  >
+                    {perfilPendiente ? "Completar perfil" : "Mi cuenta"}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => void cerrarSesion()}
+                    className="text-white/70 transition hover:text-brass"
+                  >
+                    Cerrar sesión
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link to="/login" className="text-white/70 transition hover:text-brass">
+                    Iniciar sesión
+                  </Link>
+                  <Link to="/registro" className="text-white/70 transition hover:text-brass">
+                    Crear cuenta
+                  </Link>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </footer>
     </main>

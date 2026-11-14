@@ -4,9 +4,24 @@ import { puedeAdministrar } from "@/services/usuarios"
 import { Link } from "react-router-dom"
 import { Music2, LogOut } from "lucide-react"
 import { useSesion } from "@/contexts/SesionContext"
+import { comenzarAccesoGoogle } from "@/services/google"
 
 export default function Inicio() {
   const { cerrarSesion, error } = useSesion()
+  const [errorGoogle, setErrorGoogle] = useState("")
+
+  async function vincularGoogle() {
+    setErrorGoogle("")
+    try {
+      await comenzarAccesoGoogle(true)
+    } catch (err) {
+      setErrorGoogle(
+        err instanceof Error
+          ? err.message
+          : "No se pudo iniciar la vinculación con Google.",
+      )
+    }
+  }
 
   const [admin, setAdmin] = useState(false)
   useEffect(() => {
@@ -45,6 +60,20 @@ export default function Inicio() {
           Tu acceso se ha completado. Aquí construiremos el espacio personal
           para las funciones de la tienda y la escuela de música.
         </p>
+        <div className="mt-8">
+          <button
+            type="button"
+            onClick={() => void vincularGoogle()}
+            className="rounded-xl border border-patina px-5 py-3 font-semibold text-patina transition hover:bg-patina hover:text-white"
+          >
+            Vincular cuenta de Google
+          </button>
+          {errorGoogle && (
+            <p role="alert" className="mt-3 text-red-700">
+              {errorGoogle}
+            </p>
+          )}
+        </div>
         {admin && <Link to="/administracion/usuarios" className="mt-8 inline-block rounded-xl bg-patina px-5 py-3 text-white">Administrar usuarios y roles</Link>}
       </section>
     </main>

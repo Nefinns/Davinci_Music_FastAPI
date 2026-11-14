@@ -18,5 +18,14 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+  }, {
+    files: [
+      'src/components/ui/button.tsx',
+      '@/components/ui/button.tsx',
+      'src/contexts/SesionContext.tsx',
+    ],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
   },
 ])

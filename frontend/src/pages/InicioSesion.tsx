@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom"
 import { ArrowLeft, Eye, EyeOff, Music2 } from "lucide-react"
 import { iniciarSesion } from "@/services/auth"
 import { useSesion } from "@/contexts/SesionContext"
+import { comenzarAccesoGoogle } from "@/services/google"
 
 export default function InicioSesion() {
   const navigate = useNavigate()
@@ -159,6 +160,18 @@ export default function InicioSesion() {
               {cargando ? "Ingresando..." : "Iniciar sesión"}
             </button>
           </form>
+          <button
+            type="button"
+            onClick={() => {
+              setError("")
+              void comenzarAccesoGoogle().catch((err) =>
+                setError(err instanceof Error ? err.message : "No se pudo abrir Google."),
+              )
+            }}
+            className="mt-4 w-full rounded-xl border border-ebony/20 bg-white px-5 py-3.5 font-semibold hover:border-patina"
+          >
+            Continuar con Google
+          </button>
 
           <p className="mt-7 text-center text-sm text-secondary">
             ¿Todavía no tienes cuenta?{" "}

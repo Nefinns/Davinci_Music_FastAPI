@@ -20,13 +20,13 @@ class UsuarioRegistro(SQLModel):
     direccion: Optional[str] = Field(default=None, max_length=255)
     contrasena: str = Field(min_length=8, max_length=128)
 
-
     @field_validator("curp", mode="before")
     @classmethod
     def validar_curp(cls, value):
         value = value.strip().upper()
         if not re.fullmatch(r"[A-Z][AEIOUX][A-Z]{2}[0-9]{6}[HM][A-Z]{5}[A-Z0-9][0-9]", value):
-            raise ValueError("La CURP debe tener un formato válido de 18 caracteres en mayúsculas.")
+            raise ValueError(
+                "La CURP debe tener un formato válido de 18 caracteres en mayúsculas.")
         return value
 
     @field_validator("fecha_nacimiento")
@@ -35,7 +35,8 @@ class UsuarioRegistro(SQLModel):
         hoy = date.today()
         minimo = date(hoy.year - 120, hoy.month, min(hoy.day, 28))
         if not minimo <= value <= hoy:
-            raise ValueError("La fecha de nacimiento debe estar entre hoy y hace 120 años.")
+            raise ValueError(
+                "La fecha de nacimiento debe estar entre hoy y hace 120 años.")
         return value
 
     @field_validator("nombre_usuario", "nombre", "apellido_paterno")
@@ -52,6 +53,56 @@ class UsuarioRegistro(SQLModel):
         if not re.search(r"[A-Za-z]", value) or not re.search(r"[0-9]", value):
             raise ValueError("La contraseña debe incluir letras y números.")
         return value
+
+
+class UsuarioRegistroGoogle(SQLModel):
+    """Datos locales que Google no proporciona para completar el perfil."""
+    model_config = ConfigDict(extra="forbid")
+
+    nombre_usuario: str = Field(min_length=3, max_length=100)
+    nombre: str = Field(min_length=1, max_length=100)
+    apellido_paterno: str = Field(min_length=1, max_length=100)
+    apellido_materno: Optional[str] = Field(default=None, max_length=100)
+    fecha_nacimiento: date
+    curp: str = Field(min_length=18, max_length=18)
+    ine: Optional[str] = Field(default=None, max_length=20)
+    telefono: Optional[str] = Field(default=None, max_length=20)
+    direccion: Optional[str] = Field(default=None, max_length=255)
+
+    @field_validator("curp", mode="before")
+    @classmethod
+    def validar_curp(cls, value: str) -> str:
+        if not isinstance(value, str):
+            raise ValueError("La CURP debe ser texto.")
+        value = value.strip().upper()
+        if not re.fullmatch(
+            r"[A-Z][AEIOUX][A-Z]{2}[0-9]{6}[HM][A-Z]{5}[A-Z0-9][0-9]",
+            value,
+        ):
+            raise ValueError(
+                "La CURP debe tener un formato válido de 18 caracteres."
+            )
+        return value
+
+    @field_validator("fecha_nacimiento")
+    @classmethod
+    def validar_fecha(cls, value: date) -> date:
+        hoy = date.today()
+        minimo = date(hoy.year - 120, hoy.month, min(hoy.day, 28))
+        if not minimo <= value <= hoy:
+            raise ValueError(
+                "La fecha de nacimiento debe estar entre hoy y hace 120 años."
+            )
+        return value
+
+    @field_validator("nombre_usuario", "nombre", "apellido_paterno")
+    @classmethod
+    def limpiar_requeridos(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("El campo no puede estar vacío.")
+        return value
+
 
 class UsuarioRespuesta(SQLModel):
     id_usuario: int
@@ -83,10 +134,13 @@ class UsuarioPerfil(SQLModel):
     correo: str
     activo: bool
 
+
 class SolicitudRecuperacionContrasena(SQLModel):
-    correo: str = Field(min_length = 1, max_length = 150)
+    correo: str = Field(min_length=1, max_length=150)
+
 
 class RestablecerContrasena(SQLModel):
-    token: str = Field(min_length = 1)
-    nueva_contrasena: str = Field(min_length = 8, max_length = 128)
-    _validar_contrasena = field_validator("nueva_contrasena")(UsuarioRegistro.validar_contrasena.__func__)
+    token: str = Field(min_length=1)
+    nueva_contrasena: str = Field(min_length=8, max_length=128)
+    _validar_contrasena = field_validator("nueva_contrasena")(
+        UsuarioRegistro.validar_contrasena.__func__)

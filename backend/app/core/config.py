@@ -16,10 +16,16 @@ def required(name):
 DATABASE_URL = required("DATABASE_URL")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 SUPERTOKENS_CONNECTION_URI = required("SUPERTOKENS_CONNECTION_URI").rstrip("/")
 SUPERTOKENS_API_KEY = os.getenv("SUPERTOKENS_API_KEY") or None
+
+GOOGLE_CLIENT_ID = required("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = required("GOOGLE_CLIENT_SECRET")
+
 API_DOMAIN = os.getenv("API_DOMAIN", "http://localhost:8000").rstrip("/")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+
 TENANT_ID = "public"
 for name, value in [("API_DOMAIN", API_DOMAIN), ("FRONTEND_URL", FRONTEND_URL),
                     ("SUPERTOKENS_CONNECTION_URI", SUPERTOKENS_CONNECTION_URI)]:

@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { ArrowLeft, Music2 } from "lucide-react"
 import { registrarUsuario } from "@/services/auth"
+import { comenzarAccesoGoogle } from "@/services/google"
 
 export default function Registro() {
   const navigate = useNavigate()
@@ -91,19 +92,19 @@ export default function Registro() {
     requerido?: boolean
     maxLength?: number
   }[] = [
-    { campo: "nombre_usuario", etiqueta: "Nombre de usuario", requerido: true, maxLength: 100 },
-    { campo: "nombre", etiqueta: "Nombre(s)", requerido: true, maxLength: 100 },
-    { campo: "apellido_paterno", etiqueta: "Apellido paterno", requerido: true, maxLength: 100 },
-    { campo: "apellido_materno", etiqueta: "Apellido materno", maxLength: 100 },
-    { campo: "fecha_nacimiento", etiqueta: "Fecha de nacimiento", tipo: "date", requerido: true },
-    { campo: "curp", etiqueta: "CURP", requerido: true, maxLength: 18 },
-    { campo: "ine", etiqueta: "INE (opcional)", maxLength: 20 },
-    { campo: "correo", etiqueta: "Correo electrónico", tipo: "email", requerido: true, maxLength: 150 },
-    { campo: "telefono", etiqueta: "Teléfono (opcional)", tipo: "tel", maxLength: 20 },
-    { campo: "direccion", etiqueta: "Dirección (opcional)", maxLength: 255 },
-    { campo: "contrasena", etiqueta: "Contraseña", tipo: "password", requerido: true, maxLength: 128 },
-    { campo: "confirmar_contrasena", etiqueta: "Confirmar contraseña", tipo: "password", requerido: true, maxLength: 128 },
-  ]
+      { campo: "nombre_usuario", etiqueta: "Nombre de usuario", requerido: true, maxLength: 100 },
+      { campo: "nombre", etiqueta: "Nombre(s)", requerido: true, maxLength: 100 },
+      { campo: "apellido_paterno", etiqueta: "Apellido paterno", requerido: true, maxLength: 100 },
+      { campo: "apellido_materno", etiqueta: "Apellido materno", maxLength: 100 },
+      { campo: "fecha_nacimiento", etiqueta: "Fecha de nacimiento", tipo: "date", requerido: true },
+      { campo: "curp", etiqueta: "CURP", requerido: true, maxLength: 18 },
+      { campo: "ine", etiqueta: "INE (opcional)", maxLength: 20 },
+      { campo: "correo", etiqueta: "Correo electrónico", tipo: "email", requerido: true, maxLength: 150 },
+      { campo: "telefono", etiqueta: "Teléfono (opcional)", tipo: "tel", maxLength: 20 },
+      { campo: "direccion", etiqueta: "Dirección (opcional)", maxLength: 255 },
+      { campo: "contrasena", etiqueta: "Contraseña", tipo: "password", requerido: true, maxLength: 128 },
+      { campo: "confirmar_contrasena", etiqueta: "Confirmar contraseña", tipo: "password", requerido: true, maxLength: 128 },
+    ]
 
   return (
     <main className="min-h-screen bg-ivory px-5 py-8 md:px-10">
@@ -125,6 +126,18 @@ export default function Registro() {
             Completa tus datos para formar parte de nuestra comunidad musical.
           </p>
         </header>
+        <button
+          type="button"
+          onClick={() => {
+            setError("")
+            void comenzarAccesoGoogle().catch((err) =>
+              setError(err instanceof Error ? err.message : "No se pudo abrir Google."),
+            )
+          }}
+          className="mb-5 w-full rounded-xl border border-ebony/20 bg-white px-5 py-3.5 font-semibold hover:border-patina"
+        >
+          Continuar con Google
+        </button>
 
         <form onSubmit={manejarEnvio} className="rounded-2xl border border-ebony/10 bg-white p-6 shadow-sm md:p-9">
           <h2 className="mb-5 text-xs font-bold uppercase tracking-[0.2em] text-patina">
@@ -151,14 +164,14 @@ export default function Registro() {
                   pattern={campo === "curp" ? PATRON_CURP : undefined}
                   minLength={
                     campo === "nombre_usuario" ? 3 :
-                    campo === "curp" ? 18 :
-                    campo === "contrasena" ? 8 : undefined
+                      campo === "curp" ? 18 :
+                        campo === "contrasena" ? 8 : undefined
                   }
                   autoComplete={
                     campo === "correo" ? "email" :
-                    campo === "contrasena" ? "new-password" :
-                    campo === "confirmar_contrasena" ? "new-password" :
-                    campo === "nombre_usuario" ? "username" : "off"
+                      campo === "contrasena" ? "new-password" :
+                        campo === "confirmar_contrasena" ? "new-password" :
+                          campo === "nombre_usuario" ? "username" : "off"
                   }
                   value={formulario[campo]}
                   onChange={(evento) => actualizar(campo, evento.target.value)}

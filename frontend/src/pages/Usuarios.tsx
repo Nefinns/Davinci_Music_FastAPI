@@ -21,22 +21,43 @@ export default function Usuarios() {
 
   useEffect(() => {
     if (restaurando || !autenticado) return
+
     let vigente = true
-    setCargando(true); setDatos(null); setError("")
-    void (async () => {
+
+    void Promise.resolve().then(async () => {
+      if (!vigente) return
+
+      setCargando(true)
+      setDatos(null)
+      setError("")
+
       try {
         const permitido = await puedeAdministrar()
         if (!vigente) return
+
         setAcceso(permitido)
+
         if (permitido) {
           const pagina = await listarUsuarios(consulta.q, consulta.offset)
           if (vigente) setDatos(pagina)
         }
       } catch (e) {
-        if (vigente) { setAcceso(false); setError(e instanceof Error ? e.message : "No se pudo consultar el acceso.") }
-      } finally { if (vigente) setCargando(false) }
-    })()
-    return () => { vigente = false }
+        if (vigente) {
+          setAcceso(false)
+          setError(
+            e instanceof Error
+              ? e.message
+              : "No se pudo consultar el acceso.",
+          )
+        }
+      } finally {
+        if (vigente) setCargando(false)
+      }
+    })
+
+    return () => {
+      vigente = false
+    }
   }, [autenticado, restaurando, consulta])
 
   function buscar(evento: FormEvent) {
