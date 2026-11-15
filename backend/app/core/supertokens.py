@@ -6,6 +6,8 @@ from supertokens_python.recipe import (
     session,
     thirdparty,
     userroles,
+    dashboard,
+    emailverification
 )
 from supertokens_python.recipe.thirdparty import (
     ProviderInput,
@@ -116,5 +118,7 @@ def configurar_supertokens():
                 skip_adding_roles_to_access_token=True,
                 skip_adding_permissions_to_access_token=True,
             ),
+            dashboard.init(),
+            emailverification.init(mode="OPTIONAL")
         ],
     )
