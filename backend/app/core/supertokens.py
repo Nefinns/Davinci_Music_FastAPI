@@ -37,6 +37,9 @@ from typing import Any
 import jwt
 from supertokens_python.recipe.thirdparty.provider import Provider
 
+from supertokens_python.recipe.session.exceptions import TryRefreshTokenError
+from supertokens_python.recipe.session.interfaces import RecipeInterface
+
 
 def disable_emailpassword_apis(original):
     # Los endpoints adaptadores validan el perfil y la vinculación local.
@@ -115,6 +118,70 @@ def tolerar_desfase_google(provider: Provider) -> Provider:
     provider.get_user_info = obtener_info
     return provider
 
+
+def tolerar_desfase_sesion(original: RecipeInterface) -> RecipeInterface:
+    obtener_sesion_original = original.get_session
+
+    async def obtener_sesion(
+        access_token,
+        anti_csrf_token=None,
+        anti_csrf_check=None,
+        session_required=None,
+        check_database=None,
+        override_global_claim_validators=None,
+        user_context=None,
+    ):
+        async def verificar():
+            return await obtener_sesion_original(
+                access_token=access_token,
+                anti_csrf_token=anti_csrf_token,
+                anti_csrf_check=anti_csrf_check,
+                session_required=session_required,
+                check_database=check_database,
+                override_global_claim_validators=override_global_claim_validators,
+                user_context=user_context,
+            )
+
+        try:
+            return await verificar()
+        except TryRefreshTokenError as error:
+            if str(error) != "The token is not yet valid (iat)":
+                raise
+
+            if not isinstance(access_token, str):
+                raise
+
+            try:
+                # Se lee iat exclusivamente para calcular una espera.
+                # Esta lectura NO valida ni autentica el token.
+                payload = jwt.decode(
+                    access_token,
+                    options={
+                        "verify_signature": False,
+                        "verify_exp": False,
+                        "verify_iat": False,
+                        "verify_nbf": False,
+                        "verify_aud": False,
+                    },
+                )
+                iat = payload.get("iat")
+            except (jwt.InvalidTokenError, ValueError, TypeError):
+                raise error
+
+            if isinstance(iat, bool) or not isinstance(iat, (int, float)):
+                raise error
+
+            espera = iat - time.time()
+            if not 0 < espera <= 2:
+                raise error
+
+            await asyncio.sleep(espera + 0.1)
+            return await verificar()
+
+    original.get_session = obtener_sesion
+    return original
+
+
 def configurar_supertokens():
     init(
         app_info=InputAppInfo(
@@ -160,7 +227,9 @@ def configurar_supertokens():
                 get_token_transfer_method=lambda request, for_create_new_session, user_context: "cookie",
                 cookie_secure=API_DOMAIN.startswith("https://"),
                 anti_csrf="VIA_CUSTOM_HEADER",
-            ),
+                override=session.SessionOverrideConfig(
+                functions=tolerar_desfase_sesion,
+            ),),
             userroles.init(
                 skip_adding_roles_to_access_token=True,
                 skip_adding_permissions_to_access_token=True,
