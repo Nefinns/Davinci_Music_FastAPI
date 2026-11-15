@@ -30,6 +30,13 @@ from app.core.config import (
     SUPERTOKENS_API_KEY,
 )
 
+import asyncio
+import time
+from typing import Any
+
+import jwt
+from supertokens_python.recipe.thirdparty.provider import Provider
+
 
 def disable_emailpassword_apis(original):
     # Los endpoints adaptadores validan el perfil y la vinculación local.
@@ -69,6 +76,45 @@ async def decidir_vinculacion(
     return ShouldNotAutomaticallyLink()
 
 
+def tolerar_desfase_google(provider: Provider) -> Provider:
+    obtener_info_original = provider.get_user_info
+
+    async def obtener_info(
+        oauth_tokens: dict[str, Any],
+        user_context: dict[str, Any],
+    ):
+        id_token = oauth_tokens.get("id_token")
+
+        if isinstance(id_token, str):
+            try:
+                # Solo se lee iat para decidir cuánto esperar.
+                # Esta lectura NO autentica al usuario.
+                datos = jwt.decode(
+                    id_token,
+                    options={
+                        "verify_signature": False,
+                        "verify_exp": False,
+                        "verify_iat": False,
+                        "verify_nbf": False,
+                        "verify_aud": False,
+                    },
+                )
+                iat = datos.get("iat")
+
+                if isinstance(iat, (int, float)) and not isinstance(iat, bool):
+                    espera = iat - time.time()
+
+                    if 0 < espera <= 2:
+                        await asyncio.sleep(espera + 0.1)
+            except (jwt.InvalidTokenError, ValueError, TypeError):
+                # SuperTokens hará la validación y rechazará el token inválido.
+                pass
+
+        return await obtener_info_original(oauth_tokens, user_context)
+
+    provider.get_user_info = obtener_info
+    return provider
+
 def configurar_supertokens():
     init(
         app_info=InputAppInfo(
@@ -102,7 +148,8 @@ def configurar_supertokens():
                                         client_secret=GOOGLE_CLIENT_SECRET,
                                     )
                                 ],
-                            )
+                            ),
+                            override=tolerar_desfase_google,
                         )
                     ]
                 )
