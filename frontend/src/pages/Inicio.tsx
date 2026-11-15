@@ -1,18 +1,34 @@
 import { useEffect, useState } from "react"
-import { puedeAdministrar } from "@/services/usuarios"
-
+import { consultarMetodosAcceso, puedeAdministrar } from "@/services/usuarios"
 import { Link } from "react-router-dom"
 import { Music2, LogOut } from "lucide-react"
 import { useSesion } from "@/contexts/SesionContext"
 import BotonGoogle from "@/components/BotonGoogle"
+import AgregarContrasena from "@/components/AgregarContrasena"
 
 export default function Inicio() {
   const { cerrarSesion, error } = useSesion()
   const [admin, setAdmin] = useState(false)
+  const [googleVinculado, setGoogleVinculado] = useState<boolean | null>(null)
   useEffect(() => {
     let vigente = true
     void puedeAdministrar().then(valor => { if (vigente) setAdmin(valor) }).catch(() => { if (vigente) setAdmin(false) })
     return () => { vigente = false }
+  }, [])
+  useEffect(() => {
+    let vigente = true
+
+    void consultarMetodosAcceso()
+      .then(({ google_vinculado }) => {
+        if (vigente) setGoogleVinculado(google_vinculado)
+      })
+      .catch(() => {
+        if (vigente) setGoogleVinculado(null)
+      })
+
+    return () => {
+      vigente = false
+    }
   }, [])
   return (
     <main className="min-h-screen bg-ivory p-6 md:p-12">
@@ -46,7 +62,10 @@ export default function Inicio() {
           para las funciones de la tienda y la escuela de música.
         </p>
 
-        <BotonGoogle vincular className="mt-8 max-w-sm" />
+        {googleVinculado === false && (
+          <BotonGoogle vincular className="mt-8 max-w-sm" />
+        )}
+        <AgregarContrasena />
 
         {admin && <Link to="/administracion/usuarios" className="mt-8 inline-block rounded-xl bg-patina px-5 py-3 text-white">Administrar usuarios y roles</Link>}
       </section>

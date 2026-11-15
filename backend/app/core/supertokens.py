@@ -28,6 +28,7 @@ from app.core.config import (
     GOOGLE_CLIENT_SECRET,
     SUPERTOKENS_CONNECTION_URI,
     SUPERTOKENS_API_KEY,
+    TENANT_ID,
 )
 
 import asyncio
@@ -40,11 +41,93 @@ from supertokens_python.recipe.thirdparty.provider import Provider
 from supertokens_python.recipe.session.exceptions import TryRefreshTokenError
 from supertokens_python.recipe.session.interfaces import RecipeInterface
 
+from sqlmodel import Session, select
+from supertokens_python.asyncio import get_user
+from supertokens_python.types import GeneralErrorResponse
+
+from app.db.session import engine
+from app.models.usuario import Usuario
+
 
 def disable_emailpassword_apis(original):
-    # Los endpoints adaptadores validan el perfil y la vinculación local.
-    # Desactivar las rutas alternativas evita saltarse estas comprobaciones.
-    original.disable_sign_up_post = True
+    # El registro convencional sigue pasando por /auth/registro.
+    # /auth/signup solo se habilita para añadir contraseña a una
+    # cuenta Google autenticada y con perfil local completo.
+    original_sign_up_post = original.sign_up_post
+
+    async def sign_up_post(
+        form_fields,
+        tenant_id,
+        session,
+        should_try_linking_with_session_user,
+        api_options,
+        user_context,
+    ):   
+        if (
+            session is None
+            or tenant_id != TENANT_ID
+            or session.get_tenant_id() != TENANT_ID
+            or should_try_linking_with_session_user is not True
+        ):
+            return GeneralErrorResponse(
+                message="Se requiere una sesión activa para agregar contraseña."
+            )
+
+        valores = {campo.id: campo.value for campo in form_fields}
+        correo = valores.get("email")
+        if not isinstance(correo, str):
+            return GeneralErrorResponse(message="Correo inválido.")
+
+        cuenta = await get_user(session.get_user_id())
+        if cuenta is None or not any(
+            metodo.recipe_id == "thirdparty"
+            and metodo.third_party is not None
+            and metodo.third_party.id == "google"
+            and metodo.verified
+            and tenant_id in metodo.tenant_ids
+            and metodo.has_same_email_as(correo)
+            for metodo in cuenta.login_methods
+        ):
+            return GeneralErrorResponse(
+                message="Se requiere un correo Google verificado."
+            )
+
+        if any(
+            metodo.recipe_id == "emailpassword"
+            and tenant_id in metodo.tenant_ids
+            for metodo in cuenta.login_methods
+        ):
+            return GeneralErrorResponse(
+                message="La cuenta ya tiene contraseña."
+            )
+
+        with Session(engine) as db:
+            perfil = db.exec(
+                select(Usuario).where(
+                    Usuario.identidad_externa == session.get_user_id()
+                )
+            ).first()
+
+            if (
+                perfil is None
+                or not perfil.activo
+                or perfil.correo.strip().lower() != correo.strip().lower()
+            ):
+                return GeneralErrorResponse(
+                    message="El perfil no está disponible."
+                )
+
+        return await original_sign_up_post(
+            form_fields,
+            tenant_id,
+            session,
+            should_try_linking_with_session_user,
+            api_options,
+            user_context,
+        )
+
+    original.sign_up_post = sign_up_post
+    original.disable_sign_up_post = False
     original.disable_sign_in_post = True
     original.disable_email_exists_get = True
     original.disable_generate_password_reset_token_post = True
@@ -228,8 +311,8 @@ def configurar_supertokens():
                 cookie_secure=API_DOMAIN.startswith("https://"),
                 anti_csrf="VIA_CUSTOM_HEADER",
                 override=session.SessionOverrideConfig(
-                functions=tolerar_desfase_sesion,
-            ),),
+                    functions=tolerar_desfase_sesion,
+                ),),
             userroles.init(
                 skip_adding_roles_to_access_token=True,
                 skip_adding_permissions_to_access_token=True,

@@ -65,8 +65,17 @@ async def obtener_mis_metodos_acceso(
         for metodo in cuenta.login_methods
     )
 
-    return {"google_vinculado": google_vinculado}
+    contrasena_configurada = any(
+        metodo.recipe_id == "emailpassword"
+        and TENANT_ID in metodo.tenant_ids
+        for metodo in cuenta.login_methods
+    )
 
+    return {
+        "google_vinculado": google_vinculado,
+        "contrasena_configurada": contrasena_configurada,
+        "correo": usuario.correo,
+    }
 
 @router.get("/me/roles", response_model=list[str])
 def obtener_mis_roles(
