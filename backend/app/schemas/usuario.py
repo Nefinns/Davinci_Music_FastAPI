@@ -133,6 +133,8 @@ class UsuarioPerfil(SQLModel):
     apellido_materno: Optional[str]
     correo: str
     activo: bool
+    telefono: Optional[str] = None
+    direccion: Optional[str] = None
 
 
 class SolicitudRecuperacionContrasena(SQLModel):

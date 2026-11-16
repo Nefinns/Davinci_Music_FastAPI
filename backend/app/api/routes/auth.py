@@ -10,9 +10,7 @@ from supertokens_python.recipe.emailpassword.asyncio import (
 from supertokens_python.recipe.emailpassword.interfaces import (
     CreateResetPasswordOkResult, ConsumePasswordResetTokenOkResult, UpdateEmailOrPasswordOkResult,
 )
-from supertokens_python.types import RecipeUserId
 from app.core.config import TENANT_ID, FRONTEND_URL
-from app.core.identity import obtener_por_identidad
 from app.core.dependencies import sesion_verificada
 from app.db.session import obtener_sesion
 from app.models.usuario import Usuario
@@ -26,6 +24,22 @@ from app.schemas.usuario import UsuarioRegistroGoogle
 from app.services.usuario import completar_registro_google
 
 logger = logging.getLogger(__name__)
+
+def metodo_contrasena_de(cuenta, correo: str):
+    """Busca el método de contraseña de este correo en el tenant actual."""
+    correo = correo.strip().lower()
+
+    return next(
+        (
+            metodo
+            for metodo in cuenta.login_methods
+            if metodo.recipe_id == "emailpassword"
+            and TENANT_ID in metodo.tenant_ids
+            and metodo.email is not None
+            and metodo.email.strip().lower() == correo
+        ),
+        None,
+    )
 
 
 async def verificar_origen(request: Request):
@@ -156,34 +170,99 @@ async def logout(autenticacion: SessionContainer = Depends(sesion_verificada)):
 
 
 @router.post("/recuperar-contrasena")
-async def recuperar(datos: SolicitudRecuperacionContrasena, sesion: Session = Depends(obtener_sesion)):
+async def recuperar(
+    datos: SolicitudRecuperacionContrasena,
+    sesion: Session = Depends(obtener_sesion),
+):
     usuario = buscar_por_correo(sesion, datos.correo)
-    if usuario and usuario.activo:
-        if usuario.identidad_externa:
-            resultado = await create_reset_password_token(TENANT_ID, usuario.identidad_externa, usuario.correo.strip().lower())
-            if isinstance(resultado, CreateResetPasswordOkResult):
-                try:
-                    await run_in_threadpool(enviar_correo_recuperacion, usuario.correo, resultado.token)
-                except Exception:
-                    logger.error(
-                        "No se pudo enviar un correo de recuperación; comprobar SMTP.")
-    # Misma respuesta para cuentas inexistentes, inactivas y errores de entrega.
-    return {"mensaje": "Si existe una cuenta activa, recibirás un enlace de recuperación."}
 
+    if usuario and usuario.activo and usuario.identidad_externa:
+        cuenta = await get_user(usuario.identidad_externa)
+
+        if cuenta is not None and cuenta.id == usuario.identidad_externa:
+            correo = usuario.correo.strip().lower()
+            metodo = metodo_contrasena_de(cuenta, correo)
+
+            if metodo is not None:
+                resultado = await create_reset_password_token(
+                    TENANT_ID,
+                    metodo.recipe_user_id.get_as_string(),
+                    correo,
+                )
+
+                if isinstance(resultado, CreateResetPasswordOkResult):
+                    try:
+                        await run_in_threadpool(
+                            enviar_correo_recuperacion,
+                            usuario.correo,
+                            resultado.token,
+                        )
+                    except Exception:
+                        logger.error(
+                            "No se pudo enviar un correo de recuperación; "
+                            "comprobar SMTP."
+                        )
+
+    # No revela si la cuenta existe o qué métodos de acceso tiene.
+    return {
+        "mensaje": "Si existe una cuenta activa, recibirás un enlace de recuperación."
+    }
 
 @router.post("/restablecer-contrasena")
-async def restablecer(datos: RestablecerContrasena, sesion: Session = Depends(obtener_sesion)):
+async def restablecer(
+    datos: RestablecerContrasena,
+    sesion: Session = Depends(obtener_sesion),
+):
     resultado = await consume_password_reset_token(TENANT_ID, datos.token)
+
     if not isinstance(resultado, ConsumePasswordResetTokenOkResult):
         raise HTTPException(400, "El enlace no es válido o ha expirado.")
-    usuario = obtener_por_identidad(sesion, resultado.user_id)
-    if usuario is None or not usuario.activo:
+
+    # resultado.user_id ahora es el ID del método emailpassword.
+    cuenta = await get_user(resultado.user_id)
+    if cuenta is None:
         raise HTTPException(400, "La cuenta no está disponible.")
-    # Si Core no puede revocar, no cambiar todavía la contraseña.
-    await revoke_all_sessions_for_user(usuario.identidad_externa)
-    cambio = await update_email_or_password(RecipeUserId(resultado.user_id), password=datos.nueva_contrasena,
-                                            apply_password_policy=True, tenant_id_for_password_policy=TENANT_ID)
+
+    correo = resultado.email.strip().lower()
+    metodo = metodo_contrasena_de(cuenta, correo)
+
+    if (
+        metodo is None
+        or metodo.recipe_user_id.get_as_string() != resultado.user_id
+    ):
+        raise HTTPException(400, "La cuenta no está disponible.")
+
+    # La base local guarda el ID principal, no el ID del método.
+    usuario = sesion.exec(
+        select(Usuario).where(Usuario.identidad_externa == cuenta.id)
+    ).first()
+
+    if (
+        usuario is None
+        or not usuario.activo
+        or usuario.correo.strip().lower() != correo
+    ):
+        raise HTTPException(400, "La cuenta no está disponible.")
+
+    # Conservamos el orden actual: revocar sesiones antes de cambiar la clave.
+    await revoke_all_sessions_for_user(cuenta.id)
+
+    cambio = await update_email_or_password(
+        metodo.recipe_user_id,
+        password=datos.nueva_contrasena,
+        apply_password_policy=True,
+        tenant_id_for_password_policy=TENANT_ID,
+    )
+
     if not isinstance(cambio, UpdateEmailOrPasswordOkResult):
+        logger.warning(
+            "No se completó el cambio de contraseña: %s",
+            type(cambio).__name__,
+        )
         raise HTTPException(
-            400, "No se pudo cambiar la contraseña. Solicita otro enlace y usa letras y números.")
+            400,
+            "No se pudo cambiar la contraseña. Solicita otro enlace.",
+        )
+
+
     return {"mensaje": "Contraseña actualizada. Inicia sesión nuevamente."}

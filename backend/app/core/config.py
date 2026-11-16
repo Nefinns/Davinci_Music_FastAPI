@@ -22,6 +22,9 @@ SUPERTOKENS_API_KEY = os.getenv("SUPERTOKENS_API_KEY") or None
 
 GOOGLE_CLIENT_ID = required("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = required("GOOGLE_CLIENT_SECRET")
+CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "").strip()
+CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "").strip()
+CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "").strip()
 
 API_DOMAIN = os.getenv("API_DOMAIN", "http://localhost:8000").rstrip("/")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")

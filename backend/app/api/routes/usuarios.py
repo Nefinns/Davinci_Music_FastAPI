@@ -4,6 +4,8 @@ from asyncio import Semaphore, gather
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from pydantic import ConfigDict, Field, field_validator
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_
 from sqlalchemy.sql.functions import count
 from sqlmodel import Session, col, select
@@ -34,6 +36,42 @@ from app.schemas.usuario import UsuarioPerfil
 
 
 router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
+
+
+class EdicionPerfil(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    nombre_usuario: str | None = Field(default=None, min_length=3, max_length=100)
+    nombre: str | None = Field(default=None, min_length=1, max_length=100)
+    apellido_paterno: str | None = Field(default=None, min_length=1, max_length=100)
+    apellido_materno: str | None = Field(default=None, max_length=100)
+    telefono: str | None = Field(default=None, max_length=20)
+    direccion: str | None = Field(default=None, max_length=255)
+
+    @field_validator("nombre_usuario", "nombre", "apellido_paterno")
+    @classmethod
+    def sin_espacios_vacios(cls, value: str | None) -> str:
+        if value is None or not value.strip():
+            raise ValueError("No puede estar vacío.")
+        return value.strip()
+
+
+@router.patch("/me", response_model=UsuarioPerfil)
+def editar_mi_perfil(
+    datos: EdicionPerfil,
+    usuario: Usuario = Depends(obtener_usuario_actual),
+    sesion: Session = Depends(obtener_sesion),
+):
+    """Edita datos visibles sin modificar correo, identidad ni privilegios."""
+    for nombre, valor in datos.model_dump(exclude_unset=True).items():
+        setattr(usuario, nombre, valor.strip() or None if isinstance(valor, str) else valor)
+    try:
+        sesion.add(usuario)
+        sesion.commit()
+        sesion.refresh(usuario)
+    except IntegrityError:
+        sesion.rollback()
+        raise HTTPException(409, "Ese nombre de usuario ya está ocupado.") from None
+    return usuario
 
 
 @router.get("/me", response_model=UsuarioPerfil)

@@ -14,6 +14,7 @@ configurar_supertokens()
 from app.db.session import obtener_sesion
 from app.api.routes.auth import router as auth_router
 from app.api.routes.usuarios import router as usuarios_router
+from app.api.routes.catalogo import router as catalogo_router
 
 @asynccontextmanager
 async def lifespan(app):
@@ -27,6 +28,7 @@ app.add_middleware(CORSMiddleware, allow_origins=[FRONTEND_URL], allow_credentia
                    allow_headers=["Content-Type", "Authorization"] + get_all_cors_headers())
 app.include_router(auth_router)
 app.include_router(usuarios_router)
+app.include_router(catalogo_router)
 
 @app.get("/")
 def inicio():
