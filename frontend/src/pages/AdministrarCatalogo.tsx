@@ -23,16 +23,21 @@ export default function AdministrarCatalogo() {
   const [categoriaId, setCategoriaId] = useState<number | undefined>()
   const [error, setError] = useState("")
   const [aviso, setAviso] = useState("")
+  const [filtros, setFiltros] = useState({ q: "", categoria: "", marca: "", activo: "", existencias: "todas" })
+  const [aplicados, setAplicados] = useState(new URLSearchParams())
 
-  async function recargar() {
-    const [c, i] = await Promise.all([categorias(), todosInstrumentos()])
+  async function recargar(params = aplicados) {
+    const [c, i] = await Promise.all([categorias(), todosInstrumentos(params)])
     setTipos(c); setProductos(i)
   }
   useEffect(() => {
     let vigente = true
     void puedeAdministrar().then(async permitido => {
       if (vigente) setAutorizado(permitido)
-      if (permitido && vigente) await recargar()
+      if (permitido && vigente) {
+        const [c, i] = await Promise.all([categorias(), todosInstrumentos()])
+        if (vigente) { setTipos(c); setProductos(i) }
+      }
     }).catch(e => { if (vigente) { setAutorizado(false); setError(String(e)) } })
     return () => { vigente = false }
   }, [])
@@ -100,6 +105,21 @@ export default function AdministrarCatalogo() {
       </section>
       <section className="mt-8 rounded-xl bg-white p-6">
         <h2 className="font-heading text-2xl">Inventario</h2>
+        <form className="mt-4 grid gap-3 sm:grid-cols-3" onSubmit={e => {
+          e.preventDefault()
+          const params = new URLSearchParams()
+          Object.entries(filtros).forEach(([clave, valor]) => { if (valor && valor !== "todas") params.set(clave, valor) })
+          setAplicados(params)
+          void recargar(params).catch(e => setError(String(e)))
+        }}>
+          <input aria-label="Buscar instrumento" placeholder="Nombre o modelo" value={filtros.q} onChange={e => setFiltros({ ...filtros, q: e.target.value })} className="rounded border p-2" />
+          <input aria-label="Filtrar marca" placeholder="Marca" value={filtros.marca} onChange={e => setFiltros({ ...filtros, marca: e.target.value })} className="rounded border p-2" />
+          <select aria-label="Filtrar categoría" value={filtros.categoria} onChange={e => setFiltros({ ...filtros, categoria: e.target.value })} className="rounded border p-2"><option value="">Todas las categorías</option>{tipos.map(t => <option value={t.id_categoria} key={t.id_categoria}>{t.nombre_categoria}</option>)}</select>
+          <select aria-label="Filtrar estado" value={filtros.activo} onChange={e => setFiltros({ ...filtros, activo: e.target.value })} className="rounded border p-2"><option value="">Todos los estados</option><option value="true">Activos</option><option value="false">Inactivos</option></select>
+          <select aria-label="Filtrar existencias" value={filtros.existencias} onChange={e => setFiltros({ ...filtros, existencias: e.target.value })} className="rounded border p-2"><option value="todas">Todas las existencias</option><option value="agotados">Agotados</option><option value="disponibles">Con existencias</option></select>
+          <button className="rounded bg-patina px-4 py-2 text-white">Aplicar filtros</button>
+        </form>
+        <p className="mt-4 text-sm text-secondary">{productos.length} instrumentos encontrados</p>
         <ul className="mt-4 space-y-4">{productos.map(p => <li key={p.id_instrumento} className="flex flex-wrap items-center gap-4 border-b pb-4">
           {p.imagen_url && <img src={p.imagen_url} alt="" className="h-16 w-16 object-cover" />}
           <span className="min-w-36">{p.nombre_instrumento} · {p.stock_actual} unidades {p.activo ? "" : "(inactivo)"}</span>

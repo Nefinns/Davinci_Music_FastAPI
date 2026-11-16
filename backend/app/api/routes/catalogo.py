@@ -152,8 +152,37 @@ def detalle_instrumento(id_instrumento: int, db: Session = Depends(obtener_sesio
 
 
 @router.get("/administracion/instrumentos", dependencies=admin)
-def instrumentos_admin(db: Session = Depends(obtener_sesion)):
-    return [producto_dict(r) for r in db.execute(text(BASE + " ORDER BY i.id_instrumento DESC"))]
+def instrumentos_admin(
+    q: str = Query("", max_length=100),
+    categoria: int | None = Query(None, ge=1),
+    marca: str = Query("", max_length=100),
+    activo: bool | None = None,
+    existencias: str = Query("todas", pattern="^(todas|agotados|disponibles)$"),
+    db: Session = Depends(obtener_sesion),
+):
+    """Filtra el inventario completo, incluidos los instrumentos inactivos."""
+    condiciones = []
+    parametros = {}
+    if q.strip():
+        condiciones.append("(i.nombre_instrumento ILIKE :q ESCAPE '!' OR i.modelo ILIKE :q ESCAPE '!')")
+        parametros["q"] = "%" + q.strip().replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"
+    if categoria is not None:
+        condiciones.append("i.id_categoria=:categoria")
+        parametros["categoria"] = categoria
+    if marca.strip():
+        condiciones.append("i.marca ILIKE :marca ESCAPE '!'")
+        parametros["marca"] = "%" + marca.strip().replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"
+    if activo is not None:
+        condiciones.append("i.activo=:activo")
+        parametros["activo"] = activo
+    if existencias == "agotados":
+        condiciones.append("i.stock_actual=0")
+    elif existencias == "disponibles":
+        condiciones.append("i.stock_actual>0")
+    filtro = " WHERE " + " AND ".join(condiciones) if condiciones else ""
+    return [producto_dict(r) for r in db.execute(
+        text(BASE + filtro + " ORDER BY i.id_instrumento DESC"), parametros
+    )]
 
 
 @router.post("/instrumentos", status_code=201, dependencies=admin)

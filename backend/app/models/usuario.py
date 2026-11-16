@@ -77,3 +77,6 @@ class Usuario(SQLModel, table=True):
 
     identidad_externa: Optional[str] = Field(
         default=None, sa_column=Column(String(128), nullable=True, unique=True))
+
+    imagen_perfil_public_id: Optional[str] = Field(
+        default=None, sa_column=Column(String(255), nullable=True))

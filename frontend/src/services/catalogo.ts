@@ -41,8 +41,9 @@ export function detalle(id: number) {
   return solicitar<Instrumento>(`/catalogo/instrumentos/${id}`, { metodo: "GET" })
 }
 
-export function todosInstrumentos() {
-  return solicitar<Instrumento[]>("/catalogo/administracion/instrumentos", {
+export function todosInstrumentos(parametros = new URLSearchParams()) {
+  const consulta = parametros.toString()
+  return solicitar<Instrumento[]>("/catalogo/administracion/instrumentos" + (consulta ? `?${consulta}` : ""), {
     metodo: "GET", requiereSesion: true,
   })
 }

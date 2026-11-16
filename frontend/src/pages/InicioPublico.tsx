@@ -6,10 +6,10 @@ import {
   GraduationCap,
   Headphones,
   Music,
-  BookOpen,
   LogOut,
 } from "lucide-react"
 import { useSesion } from "@/contexts/SesionContext"
+import AvatarPerfil from "@/components/AvatarPerfil"
 
 const opciones = [
   {
@@ -83,12 +83,16 @@ export default function InicioPublico() {
             {!cargando &&
               (autenticado ? (
                 <>
-                  <Link
-                    to={perfilPendiente ? "/completar-perfil" : "/inicio"}
-                    className="hidden rounded-full px-4 py-2 text-sm font-semibold transition hover:bg-black/5 sm:inline-flex"
-                  >
-                    {perfilPendiente ? "Completar perfil" : "Mi cuenta"}
-                  </Link>
+                  {perfilPendiente ? (
+                    <Link
+                      to="/completar-perfil"
+                      className="rounded-full px-4 py-2 text-sm font-semibold hover:bg-black/5"
+                    >
+                      Completar perfil
+                    </Link>
+                  ) : (
+                    <AvatarPerfil />
+                  )}
                   <button
                     type="button"
                     onClick={() => void cerrarSesion()}
@@ -281,14 +285,10 @@ export default function InicioPublico() {
 
       <section id="escuela" className="bg-[#e6ebe5]">
         <div className="mx-auto grid max-w-7xl gap-10 px-6 py-20 md:grid-cols-2 md:items-center lg:px-10">
-          <div className="flex min-h-64 items-center justify-center rounded-3xl bg-sidebar p-10 text-brass">
-            <div className="text-center">
-              <GraduationCap className="mx-auto h-20 w-20" strokeWidth={1} />
-              <p className="mt-5 font-heading text-3xl font-semibold text-white">
-                Aprende. Practica. Evoluciona.
-              </p>
-            </div>
-          </div>
+          <figure className="overflow-hidden rounded-3xl bg-white shadow-sm">
+            <img src="/images/folleto-clases.jpeg" alt="Folleto de la Escuela de Música Da Vinci con las disciplinas musicales" className="w-full" />
+            <figcaption className="p-4 text-sm text-secondary">Folleto de clases. Los datos de contacto impresos son antiguos; consulta los datos actualizados en <Link className="text-patina underline" to="/contacto">Contacto</Link>.</figcaption>
+          </figure>
 
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.25em] text-patina">
@@ -300,9 +300,9 @@ export default function InicioPublico() {
             </h2>
 
             <p className="mt-5 leading-7 text-secondary">
-              DaVinciMusic reúne la tienda de instrumentos y la formación
-              musical en un mismo espacio. Explora las posibilidades y comienza
-              a construir tu camino musical.
+              La Escuela de Música Da Vinci ofrece clases presenciales de
+              instrumentos como violín, guitarra, piano y batería, además de
+              otras disciplinas. Consulta la disponibilidad de cada clase.
             </p>
 
             <Link
@@ -317,29 +317,17 @@ export default function InicioPublico() {
       </section>
 
       <section id="nosotros" className="mx-auto max-w-7xl px-6 py-20 lg:px-10">
-        <div className="mx-auto max-w-3xl text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brass/20 text-patina">
-            <BookOpen size={27} />
+        <div className="grid items-center gap-10 md:grid-cols-2">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.25em] text-patina">Nosotros</p>
+            <h2 className="mt-5 font-heading text-4xl font-semibold md:text-5xl">Escuela y tienda de música en Tonalá</h2>
+            <p className="mt-5 leading-8 text-secondary">La Escuela de Música Da Vinci es un espacio de enseñanza musical con clases presenciales. En la tienda encontrarás instrumentos y equipo para acompañar tu aprendizaje. También puedes consultar por contrataciones musicales y facturación.</p>
+            <Link to="/contacto" className="mt-7 inline-flex items-center gap-2 font-semibold text-patina underline">Visítanos o escríbenos <ArrowRight size={17} /></Link>
           </div>
-
-          <h2 className="mt-5 font-heading text-4xl font-semibold md:text-5xl">
-            Mucho más que una tienda musical
-          </h2>
-
-          <p className="mt-5 leading-8 text-secondary">
-            Nuestro propósito es acercar la música a más personas, facilitando
-            el acceso a instrumentos y creando oportunidades para aprender.
-            Queremos que encuentres en DaVinciMusic un lugar para explorar tu
-            creatividad y desarrollar tu talento.
-          </p>
-
-          <Link
-            to={destinoCuenta}
-            className="mt-8 inline-flex items-center gap-2 font-semibold text-patina hover:text-sidebar"
-          >
-            {autenticado ? "Ir a mi espacio" : "Forma parte de DaVinciMusic"}
-            <ArrowRight size={17} />
-          </Link>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <img src="/images/logo-escuela.jpeg" alt="Emblema de la Escuela de Música Da Vinci" className="h-64 w-full rounded-2xl object-cover" />
+            <img src="/images/guitarras-tienda.jpeg" alt="Muro de guitarras y teclado en la tienda Da Vinci" className="h-64 w-full rounded-2xl object-cover" />
+          </div>
         </div>
       </section>
 

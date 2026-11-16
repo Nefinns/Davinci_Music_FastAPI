@@ -135,6 +135,7 @@ class UsuarioPerfil(SQLModel):
     activo: bool
     telefono: Optional[str] = None
     direccion: Optional[str] = None
+    imagen_url: Optional[str] = None
 
 
 class SolicitudRecuperacionContrasena(SQLModel):

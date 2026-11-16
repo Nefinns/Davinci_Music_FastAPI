@@ -19,6 +19,7 @@ CREATE TABLE usuario (
     telefono           VARCHAR(20),                -- opcional
     direccion          VARCHAR(255),               -- opcional
     identidad_externa VARCHAR(128) UNIQUE, -- ID de usuario de SuperTokens
+    imagen_perfil_public_id VARCHAR(255), -- imagen de perfil en Cloudinary
     activo             BOOLEAN NOT NULL DEFAULT TRUE,
     fecha_registro     TIMESTAMP NOT NULL DEFAULT NOW()
 );

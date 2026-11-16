@@ -69,3 +69,15 @@ export function cambiarRol(id: number, rol: Rol, agregar: boolean) {
     { metodo: agregar ? "PUT" : "DELETE", requiereSesion: true },
   )
 }
+export function darBajaUsuario(id: number) {
+  return solicitar<{ mensaje: string }>(`/usuarios/${id}/baja`, {
+    metodo: "POST", requiereSesion: true, datos: { confirmar: true },
+  })
+}
+
+export function reactivarUsuario(id: number) {
+  return solicitar<{ mensaje: string }>(`/usuarios/${id}/reactivar`, {
+    metodo: "POST",
+    requiereSesion: true,
+  })
+}

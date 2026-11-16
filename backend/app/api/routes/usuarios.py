@@ -1,14 +1,21 @@
 """Rutas del perfil y administración de usuarios."""
 
 from asyncio import Semaphore, gather
+from io import BytesIO
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import cloudinary
+import cloudinary.uploader
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel
 from pydantic import ConfigDict, Field, field_validator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_
 from sqlalchemy.sql.functions import count
 from sqlmodel import Session, col, select
+from sqlalchemy import text
+from starlette.concurrency import run_in_threadpool
 from supertokens_python.asyncio import get_user
 from supertokens_python.recipe.session.asyncio import revoke_all_sessions_for_user
 from supertokens_python.recipe.userroles.asyncio import (
@@ -21,7 +28,9 @@ from supertokens_python.recipe.userroles.interfaces import (
     RemoveUserRoleOkResult,
 )
 
-from app.core.config import TENANT_ID
+from app.core.config import (
+    CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CLOUDINARY_CLOUD_NAME, TENANT_ID,
+)
 from app.core.dependencies import (
     obtener_permisos_usuario,
     obtener_roles_usuario,
@@ -36,6 +45,18 @@ from app.schemas.usuario import UsuarioPerfil
 
 
 router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
+
+
+def perfil_con_imagen(usuario: Usuario) -> dict:
+    """Resuelve la foto sin exponer identificadores de almacenamiento."""
+    datos = UsuarioPerfil.model_validate(usuario, from_attributes=True).model_dump()
+    public_id = usuario.imagen_perfil_public_id
+    datos["imagen_url"] = (
+        cloudinary.CloudinaryImage(public_id).build_url(
+            secure=True, quality="auto", fetch_format="auto"
+        ) if public_id and CLOUDINARY_CLOUD_NAME else None
+    )
+    return datos
 
 
 class EdicionPerfil(BaseModel):
@@ -71,7 +92,7 @@ def editar_mi_perfil(
     except IntegrityError:
         sesion.rollback()
         raise HTTPException(409, "Ese nombre de usuario ya está ocupado.") from None
-    return usuario
+    return perfil_con_imagen(usuario)
 
 
 @router.get("/me", response_model=UsuarioPerfil)
@@ -79,8 +100,147 @@ def obtener_perfil(
     usuario: Usuario = Depends(obtener_usuario_actual),
 ):
     """Devuelve el perfil local del usuario autenticado."""
-    return usuario
+    return perfil_con_imagen(usuario)
 
+
+@router.post("/me/imagen", response_model=UsuarioPerfil)
+async def subir_foto_perfil(
+    archivo: UploadFile = File(...),
+    usuario: Usuario = Depends(obtener_usuario_actual),
+    sesion: Session = Depends(obtener_sesion),
+):
+    """Almacena una foto validada y mantiene el identificador en PostgreSQL."""
+    if archivo.content_type not in {"image/jpeg", "image/png", "image/webp"}:
+        raise HTTPException(422, "Usa JPG, PNG o WebP.")
+    contenido = await archivo.read(5 * 1024 * 1024 + 1)
+    if len(contenido) > 5 * 1024 * 1024:
+        raise HTTPException(413, "La foto supera 5 MB.")
+    try:
+        with Image.open(BytesIO(contenido)) as foto:
+            if foto.format not in {"JPEG", "PNG", "WEBP"}:
+                raise HTTPException(422, "Formato de imagen no permitido.")
+            foto.verify()
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+        raise HTTPException(422, "Archivo de imagen inválido.") from None
+    if not all((CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET)):
+        raise HTTPException(503, "Cloudinary no está configurado.")
+    try:
+        resultado = await run_in_threadpool(
+            cloudinary.uploader.upload, BytesIO(contenido),
+            folder="davincimusic/perfiles", resource_type="image",
+        )
+        nuevo_id = resultado["public_id"]
+    except Exception:
+        raise HTTPException(503, "No se pudo subir la foto.") from None
+    anterior = usuario.imagen_perfil_public_id
+    try:
+        usuario.imagen_perfil_public_id = nuevo_id
+        sesion.add(usuario)
+        sesion.commit()
+        sesion.refresh(usuario)
+    except Exception:
+        sesion.rollback()
+        await run_in_threadpool(cloudinary.uploader.destroy, nuevo_id)
+        raise
+    if anterior:
+        try:
+            await run_in_threadpool(cloudinary.uploader.destroy, anterior)
+        except Exception:
+            pass
+    return perfil_con_imagen(usuario)
+
+
+class ConfirmacionBaja(BaseModel):
+    confirmar: bool
+
+
+@router.post("/me/baja")
+async def dar_de_baja_mi_cuenta(
+    datos: ConfirmacionBaja,
+    usuario: Usuario = Depends(obtener_usuario_actual),
+    roles: list[str] = Depends(obtener_roles_usuario),
+    sesion: Session = Depends(obtener_sesion),
+):
+    """Desactiva el acceso sin alterar inscripciones ni historial académico."""
+    if not datos.confirmar:
+        raise HTTPException(422, "Debes confirmar la baja de la cuenta.")
+    if set(roles) & {"administrador", "maestro"}:
+        raise HTTPException(403, "Solicita a otro administrador la baja de esta cuenta.")
+    if sesion.execute(text(
+        "SELECT 1 FROM administrador WHERE id_usuario=:id UNION ALL "
+        "SELECT 1 FROM maestro WHERE id_usuario=:id LIMIT 1"
+    ), {"id": usuario.id_usuario}).first():
+        raise HTTPException(403, "Hay un perfil administrativo o docente asociado.")
+    await revoke_all_sessions_for_user(usuario.identidad_externa)
+    usuario.activo = False
+    sesion.add(usuario)
+    sesion.commit()
+    return {"mensaje": "Acceso desactivado. La baja de clases debe solicitarse a un administrador."}
+
+
+@router.post(
+    "/{id_usuario}/baja",
+    dependencies=[Depends(requerir_rol("administrador")),
+                  Depends(requerir_permiso("usuarios:roles:administrar"))],
+)
+async def baja_por_administrador(
+    id_usuario: int,
+    datos: ConfirmacionBaja,
+    actor: Usuario = Depends(obtener_usuario_actual),
+    sesion: Session = Depends(obtener_sesion),
+):
+    """Un administrador puede desactivar otras cuentas, también docentes."""
+    if not datos.confirmar:
+        raise HTTPException(422, "Debes confirmar la baja de la cuenta.")
+    if actor.id_usuario == id_usuario:
+        raise HTTPException(403, "Un administrador no puede darse de baja a sí mismo.")
+    destino = sesion.get(Usuario, id_usuario)
+    if destino is None:
+        raise HTTPException(404, "Usuario no encontrado.")
+    if not destino.activo:
+        raise HTTPException(409, "La cuenta ya está inactiva.")
+    if destino.identidad_externa:
+        await revoke_all_sessions_for_user(destino.identidad_externa)
+    destino.activo = False
+    sesion.add(destino)
+    sesion.commit()
+    return {"mensaje": "Cuenta desactivada. Se conservaron las inscripciones y registros académicos."}
+
+@router.post(
+    "/{id_usuario}/reactivar",
+    dependencies=[
+        Depends(requerir_rol("administrador")),
+        Depends(requerir_permiso("usuarios:roles:administrar")),
+    ],
+)
+async def reactivar_por_administrador(
+    id_usuario: int,
+    actor: Usuario = Depends(obtener_usuario_actual),
+    sesion: Session = Depends(obtener_sesion),
+):
+    if actor.id_usuario == id_usuario:
+        raise HTTPException(403, "No puedes reactivar tu propia cuenta.")
+
+    destino = sesion.get(Usuario, id_usuario)
+    if destino is None:
+        raise HTTPException(404, "Usuario no encontrado.")
+    if destino.activo:
+        raise HTTPException(409, "La cuenta ya está activa.")
+    if not destino.identidad_externa:
+        raise HTTPException(
+            409, "La cuenta no tiene una identidad de acceso vinculada."
+        )
+
+    cuenta = await get_user(destino.identidad_externa)
+    if cuenta is None or cuenta.id != destino.identidad_externa:
+        raise HTTPException(
+            409, "La identidad de acceso ya no existe en SuperTokens."
+        )
+
+    destino.activo = True
+    sesion.add(destino)
+    sesion.commit()
+    return {"mensaje": "Cuenta reactivada. El usuario ya puede iniciar sesión nuevamente."}
 
 @router.get("/me/metodos-acceso")
 async def obtener_mis_metodos_acceso(

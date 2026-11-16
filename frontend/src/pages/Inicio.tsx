@@ -5,6 +5,7 @@ import { Music2, LogOut } from "lucide-react"
 import { useSesion } from "@/contexts/SesionContext"
 import BotonGoogle from "@/components/BotonGoogle"
 import AgregarContrasena from "@/components/AgregarContrasena"
+import AvatarPerfil from "@/components/AvatarPerfil"
 
 export default function Inicio() {
   const { cerrarSesion, error } = useSesion()
@@ -40,13 +41,16 @@ export default function Inicio() {
           </span>
         </Link>
 
-        <button
-          onClick={cerrarSesion}
-          className="inline-flex items-center gap-2 rounded-full border border-ebony/15 px-4 py-2 text-sm font-semibold transition hover:border-patina hover:text-patina"
-        >
-          <LogOut size={16} />
-          Cerrar sesión
-        </button>
+        <div className="flex items-center gap-2">
+          <AvatarPerfil />
+          <button
+            onClick={cerrarSesion}
+            className="inline-flex items-center gap-2 rounded-full border border-ebony/15 px-4 py-2 text-sm font-semibold transition hover:border-patina hover:text-patina"
+          >
+            <LogOut size={16} />
+            Cerrar sesión
+          </button>
+        </div>
       </header>
       {error && <p role="alert" className="mt-4 text-red-700">{error}</p>}
 
