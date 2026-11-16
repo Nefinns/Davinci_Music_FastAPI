@@ -45,7 +45,7 @@ export default function InicioPublico() {
       : "/inicio"
     : "/registro"
   const destinoTienda = "/catalogo"
-  const destinoEscuela = autenticado ? "#escuela" : "/registro"
+  const destinoEscuela = "/escuela"
 
   return (
     <main className="min-h-screen bg-ivory text-ebony">
@@ -70,9 +70,7 @@ export default function InicioPublico() {
             <Link to="/catalogo" className="text-sm text-secondary hover:text-patina">
               Tienda
             </Link>
-            <a href="#escuela" className="text-sm text-secondary hover:text-patina">
-              Escuela de música
-            </a>
+            <Link to="/escuela" className="text-sm text-secondary hover:text-patina">Escuela de música</Link>
             <a href="#nosotros" className="text-sm text-secondary hover:text-patina">
               Nosotros
             </a>

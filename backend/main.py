@@ -15,6 +15,8 @@ from app.db.session import obtener_sesion
 from app.api.routes.auth import router as auth_router
 from app.api.routes.usuarios import router as usuarios_router
 from app.api.routes.catalogo import router as catalogo_router
+from app.api.routes.escuela import router as escuela_router
+from app.api.routes.compras import router as compras_router
 
 @asynccontextmanager
 async def lifespan(app):
@@ -29,6 +31,8 @@ app.add_middleware(CORSMiddleware, allow_origins=[FRONTEND_URL], allow_credentia
 app.include_router(auth_router)
 app.include_router(usuarios_router)
 app.include_router(catalogo_router)
+app.include_router(escuela_router)
+app.include_router(compras_router)
 
 @app.get("/")
 def inicio():

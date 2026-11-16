@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react"
 import { Link, useParams } from "react-router-dom"
+import { agregarCarrito } from '@/services/carrito'
 import { detalle, type Instrumento } from "@/services/catalogo"
 
 export default function DetalleInstrumento() {
   const { id } = useParams()
   const [instrumento, setInstrumento] = useState<Instrumento | null>(null)
+  const [mensaje,setMensaje] = useState('')
   const [error, setError] = useState("")
   useEffect(() => {
     let vigente = true
@@ -24,6 +26,8 @@ export default function DetalleInstrumento() {
             <div>Tamaño: {instrumento.tamano || "No especificado"}</div><div>Color: {instrumento.color || "No especificado"}</div>
             <div>Disponibilidad: {instrumento.stock_actual > 0 ? `${instrumento.stock_actual} en inventario` : "Agotado"}</div>
           </dl>
+          <div className="mt-6 flex flex-wrap items-center gap-4"><button disabled={!instrumento.stock_actual} className="rounded-xl bg-patina px-5 py-3 font-semibold text-white disabled:opacity-50" onClick={()=>{try{agregarCarrito(instrumento);setMensaje('Instrumento añadido al carrito.');setError('')}catch(e){setError(String(e))}}}>Añadir al carrito</button><Link to="/carrito" className="text-patina underline">Ver carrito</Link></div>
+          {mensaje&&<p role="status" className="mt-3 text-patina">{mensaje}</p>}
         </div>
       </article>}
     </div>

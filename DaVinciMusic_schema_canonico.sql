@@ -1,7 +1,11 @@
 -- DaVinci Music - esquema canónico PostgreSQL
 -- Basado en el modelo relacional y el diccionario de datos corregidos.
 -- Nombres oficiales: detalle_orden e id_proveedor.
--- Este archivo crea las 16 tablas; ejecútese en una base de datos vacía.
+-- Versión posterior al parche de Escuela, Inscripciones y Compra.
+-- Crea las 16 tablas de negocio y 2 auxiliares de Checkout.
+-- SOLO PARA UNA BASE VACÍA: no ejecutar sobre la base existente.
+-- Para actualizar una base previa usar backend/sql/sprints_5_6_3.sql.
+-- No crea usuarios ni modifica identidades de SuperTokens.
 -- La versión Next.js debe mapear sus nombres físicos antiguos si se conserva su esquema previo.
 
 BEGIN;
@@ -116,7 +120,7 @@ CREATE TABLE pago_clase (
 CREATE TABLE venta (
     id_venta          SERIAL PRIMARY KEY,
     id_cliente        INT NOT NULL REFERENCES cliente(id_cliente),
-    id_administrador  INT NOT NULL REFERENCES administrador(id_administrador),
+    id_administrador  INT REFERENCES administrador(id_administrador), -- NULL en ventas web sin asignación
     fecha_venta       TIMESTAMP NOT NULL DEFAULT NOW(),
     metodo_pago       VARCHAR(30) NOT NULL,
     estado_venta      VARCHAR(30) NOT NULL DEFAULT 'Completada'
@@ -156,5 +160,24 @@ CREATE TABLE detalle_orden (
     costo_unitario       DECIMAL(10,2) NOT NULL,
     PRIMARY KEY (id_orden, id_instrumento)
 );
+
+-- Extensiones del flujo de compra web: snapshot de Checkout y eventos procesados.
+CREATE TABLE compra_checkout (
+ id_venta INT PRIMARY KEY REFERENCES venta(id_venta),
+ solicitud UUID NOT NULL UNIQUE,
+ stripe_session_id VARCHAR(255) UNIQUE,
+ checkout_url TEXT,
+ items_json JSONB NOT NULL,
+ total_centavos BIGINT NOT NULL CHECK(total_centavos>0),
+ creada TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE evento_pago (
+ id_evento VARCHAR(255) PRIMARY KEY,
+ recibido TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX inscripcion_activa_unica
+ ON inscripcion_clase(id_cliente,id_clase) WHERE estado_inscripcion='Activa';
+CREATE INDEX inscripcion_clase_estado ON inscripcion_clase(id_clase,estado_inscripcion);
+CREATE INDEX venta_cliente_fecha ON venta(id_cliente,fecha_venta);
 
 COMMIT;

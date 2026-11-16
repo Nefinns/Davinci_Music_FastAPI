@@ -28,6 +28,7 @@ export default function Catalogo() {
   return <main className="min-h-screen bg-ivory px-6 py-10 text-ebony">
     <div className="mx-auto max-w-6xl">
       <Link to="/" className="text-patina">← DaVinciMusic</Link>
+      <nav className="mt-4 flex gap-5 text-patina"><Link to="/carrito">Ver carrito</Link><Link to="/mis-compras">Mis compras</Link><Link to="/escuela">Escuela</Link></nav>
       <h1 className="mt-8 font-heading text-5xl">Catálogo de instrumentos</h1>
       <form onSubmit={e => { e.preventDefault(); cambiar("q", busqueda) }} className="mt-8 flex flex-wrap gap-3">
         <input aria-label="Buscar instrumentos" className="rounded-lg border p-3" placeholder="Buscar por nombre o modelo" value={busqueda} onChange={e => setBusqueda(e.target.value)} />

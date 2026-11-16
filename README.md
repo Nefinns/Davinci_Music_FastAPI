@@ -1,127 +1,112 @@
-# DaVinci Music
+# DaVinciMusic
 
-Aplicación web en desarrollo para una tienda de instrumentos y una escuela de música. Utiliza FastAPI, React con TypeScript y PostgreSQL en Neon. La identidad, las credenciales y las sesiones se gestionan con SuperTokens.
+Plataforma en desarrollo para tienda de instrumentos musicales y escuela de música. Implementación propia con FastAPI, PostgreSQL en Neon y React. SuperTokens gestiona identidad, credenciales y sesiones; Cloudinary almacena imágenes. La compra utiliza Stripe Checkout en modo de prueba.
 
-## Estado del proyecto
+Este README corresponde al ZIP base `(6)(1)` con el parche `DaVinciMusic_Parche_Sprints_5_6_Inscripciones_3_Compra.zip`. La rama de trabajo debe contener esos cambios para que las rutas descritas estén disponibles. La documentación no aplica ni instala el código por sí sola.
 
-La rama `desarrollo_proyecto` contiene la aplicación principal. Las ramas de prácticas de Bases de Datos y el prototipo de categorías son trabajos separados; sus funciones no están integradas automáticamente en esta aplicación.
+## Estado y alcance actual
 
-El código incluye:
-
-- Registro con validación de datos, creación del perfil en PostgreSQL y alta de identidad en SuperTokens.
-- Asignación inicial del rol `cliente` y creación del registro local correspondiente.
-- Inicio de sesión por correo y contraseña y sesiones mediante cookies.
-- Cierre de sesión mediante el SDK de SuperTokens.
-- Recuperación y restablecimiento de contraseña, con pantallas React y envío por SMTP SSL.
-- Consulta del perfil, roles y permisos del usuario autenticado.
-- Administración de roles con búsqueda y paginación de usuarios, confirmación de cambios y revocación de sesiones de la cuenta afectada.
-- Página pública y página de inicio protegida.
-- Edición de datos de perfil autorizados, catálogo público con búsqueda,
-  filtros, paginación y detalle de instrumentos.
-- Administración de categorías, instrumentos y existencias, retirada lógica de
-  productos y subida de imágenes a Cloudinary.
-- Comprobación de disponibilidad de la API y de conexión a PostgreSQL.
-
-La presencia de estas funciones en el código no sustituye las pruebas de integración contra los servicios configurados.
-
-Pendientes: ajustes automáticos de inventario por ventas y abastecimiento, carrito,
-pagos, módulos académicos, reportes y despliegue. La sección de escuela sigue
-siendo informativa. La página Contacto tiene texto base hasta contar con datos
-públicos de la tienda.
-
-## Stack
-
-| Capa | Tecnologías |
+| Área | Funciones incluidas |
 |---|---|
-| Backend | Python, FastAPI y Uvicorn |
-| Persistencia | PostgreSQL en Neon, SQLModel, SQLAlchemy y psycopg2 |
-| Identidad y sesiones | SuperTokens Core, `supertokens_python` y `supertokens-web-js` |
+| Usuarios | Registro, acceso convencional y Google, vinculación de métodos, recuperación de contraseña, logout y sesiones con cookies |
+| Perfil | Edición de datos autorizados, foto con Cloudinary y avatar con imagen predeterminada |
+| Administración de usuarios | Búsqueda, paginación, roles, baja lógica y reactivación |
+| Tienda | Categorías, instrumentos, precios, existencias, imágenes, filtros, paginación y detalle público |
+| Escuela — Sprint 5 | Periodos, perfiles docentes de usuarios existentes, clases, niveles, costos, cupos y horarios; catálogo académico público |
+| Inscripciones — Sprint 6, primera parte | Inscripción del cliente, rechazo de duplicados y cupo agotado, consulta personal y baja por administrador |
+| Compra — Sprint 3 | Carrito, ventas y detalles, reserva de stock, Checkout de prueba, webhook y conciliación del pago; historial básico |
+| Contenido público | Inicio, Nosotros y Contacto con datos e imágenes de la escuela |
+
+Las funciones están implementadas en código; deben probarse con los servicios externos configurados en el entorno donde se presentará el proyecto.
+
+## Stack y dependencias
+
+| Capa | Tecnología |
+|---|---|
+| API | Python, FastAPI, Uvicorn |
+| Persistencia | PostgreSQL, SQLModel, SQLAlchemy, psycopg2 |
+| Identidad y sesiones | SuperTokens Core administrado, supertokens_python y supertokens-web-js |
 | Frontend | React, TypeScript, Vite y React Router |
-| Interfaz | Tailwind CSS, componentes shadcn/ui configurados con Base UI y Lucide |
-| Correo | SMTP SSL mediante `smtplib` |
+| Interfaz | Tailwind CSS, componentes shadcn/ui con Base UI y Lucide |
+| Imágenes | Cloudinary |
+| Recuperación de contraseña | SMTP SSL con smtplib |
+| Compra | Stripe Checkout alojado, API REST mediante requests |
 
-Las dependencias están declaradas en `requirements.txt` y `frontend/package.json`; el frontend conserva su resolución en `frontend/package-lock.json`. Las versiones y auditorías deben verificarse en el entorno de instalación.
+Las dependencias están en `requirements.txt`, `frontend/package.json` y `frontend/package-lock.json`. El parche de sprints 5/6/3 reutiliza las dependencias existentes. Stripe CLI es una herramienta externa adicional para recibir webhooks en localhost. Las dependencias para pruebas automatizadas son opcionales y están en `backend/tests/README.md`.
 
-## Identidad y modelo de datos
+## Modelo de datos
 
-PostgreSQL conserva los datos del negocio en las 16 tablas canónicas. `usuario.id_usuario` sigue siendo la clave primaria local y las relaciones existentes conservan sus claves foráneas.
+El esquema conserva las 16 tablas canónicas de negocio: usuario, cliente, administrador, maestro, categoria_instrumento, instrumento, periodo_academico, clase, horario_clase, inscripcion_clase, pago_clase, venta, detalle_venta, proveedor, orden_abastecimiento y detalle_orden.
 
-`usuario.identidad_externa` es un `VARCHAR(128) UNIQUE` que enlaza el perfil con el ID de usuario de SuperTokens. No contiene un token de sesión ni una contraseña. El esquema actualizado no incluye `contrasena_hash`; el modelo y el servicio de registro tampoco deben incluirlo.
+Se agregan dos tablas auxiliares: `compra_checkout` (solicitud idempotente, sesión de Stripe, snapshot de artículos y total) y `evento_pago` (eventos procesados). El total actual es **18 tablas**. Se documentan estas extensiones para mantener consistente el modelo con las otras implementaciones del equipo.
 
-La columna de identidad permite `NULL` porque el registro primero realiza un `flush` del perfil local para validar restricciones y después crea la identidad externa. Antes del `commit`, asigna la identidad y crea el cliente. Las operaciones protegidas exigen un perfil vinculado y activo. Si falla el registro, el servicio revierte la transacción local e intenta eliminar la identidad externa creada; una falla de esa compensación requiere revisión.
+`usuario.id_usuario` es la clave local. `identidad_externa` enlaza con el ID principal de SuperTokens; no es un token ni una contraseña. El esquema actual no incluye `contrasena_hash`. SuperTokens administra las credenciales. Las imágenes se referencian mediante `imagen_perfil_public_id` e `imagen_public_id`.
 
-Las contraseñas recibidas en los formularios se envían a la API para su validación y uso con SuperTokens. No se guardan como campos del perfil local. SuperTokens administra sus credenciales; la aplicación no calcula ni verifica hashes propios.
+Los roles se consultan en SuperTokens. Asignar el rol maestro no crea automáticamente su registro local: se completa desde Administrar escuela. Las ventas web permiten `venta.id_administrador=NULL` hasta que exista una asignación; no se inventa un administrador al comprar.
 
-Los roles `cliente`, `maestro` y `administrador`, y sus permisos de acceso, se consultan en SuperTokens. Asignar un rol no crea por sí solo un registro de maestro o administrador en PostgreSQL; la gestión de esas entidades se completará con los módulos del negocio. El registro público siempre asigna `cliente`.
+La baja de acceso conserva usuario, relaciones e identidad. Un cliente puede solicitar su propia baja; maestros y administradores requieren otro administrador. La reactivación permite volver a iniciar sesión si la identidad externa sigue disponible. La baja de acceso no cancela una inscripción; la baja académica se gestiona por separado.
+
+## PostgreSQL: instalación nueva o actualización
+
+**Base vacía:** ejecuta `DaVinciMusic_schema_canonico.sql` desde pgAdmin o Neon. El esquema actualizado crea las 18 tablas y los índices del parche dentro de una transacción. No requiere ejecutar después las migraciones ya incorporadas. La API no crea tablas al iniciar.
+
+**Base existente:** conserva todos sus datos y ejecuta únicamente las migraciones que falten:
+
+| Cambio | Script |
+|---|---|
+| Imagen del instrumento | `backend/sql/sprint2_imagen_instrumento.sql` |
+| Imagen de perfil | `backend/sql/perfil_imagen.sql` |
+| Escuela/inscripciones y compra web | `backend/sql/sprints_5_6_3.sql` |
+
+Si ya ejecutaste esos scripts, reemplazar este README y el archivo canónico es solo una actualización de los archivos del proyecto: **no vuelvas a ejecutar el esquema completo en tu base actual**.
+
+La migración de sprints 5/6/3 crea las dos tablas auxiliares, agrega tres índices y permite administrador nulo en ventas web. No modifica usuarios ni identidades. El índice parcial impide dos inscripciones Activa del mismo cliente en la misma clase; una inscripción dada de baja puede conservarse como historial.
 
 ## Instalación local en Windows / PowerShell
 
-### 1. Obtener la aplicación y preparar Python
+Trabaja en tu copia actual del proyecto con los parches aplicados. Para una instalación nueva, prepara el entorno desde la raíz:
 
 ```powershell
-git clone --branch desarrollo_proyecto https://github.com/Nefinns/Davinci_Music_FastAPI.git
-cd Davinci_Music_FastAPI
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-Se utiliza directamente el intérprete del entorno virtual. Si ya tienes el proyecto, trabaja en tu copia de `desarrollo_proyecto` conservando tus cambios locales.
+Si tu entorno existente se llama `venv`, usa ese nombre en los comandos; no es necesario crear otro entorno.
 
-### 2. Preparar PostgreSQL y SuperTokens
-
-Para una base vacía, ejecuta `DaVinciMusic_schema_canonico.sql` desde pgAdmin o el editor SQL de Neon. El archivo crea las 16 tablas dentro de una transacción. La API no crea las tablas al arrancar.
-
-Para una base existente, no ejecutes de nuevo ese script: es un esquema inicial, no una migración. Si la identidad externa ya está incorporada y solo queda la columna del hash antiguo, primero aplica la limpieza del modelo y del servicio. La eliminación física de la columna es un paso separado; no requiere borrar usuarios ni recrear tablas.
-
-Para añadir imágenes al catálogo de una base existente, ejecuta en pgAdmin
-`backend/sql/sprint2_imagen_instrumento.sql`. Agrega una columna opcional a
-`instrumento` y no modifica las filas actuales.
-
-Configura una instancia de SuperTokens Core accesible para el backend. Usa su URI y, para Core remoto, su API key. PostgreSQL del negocio y el almacenamiento administrado por Core tienen responsabilidades distintas.
-
-### 3. Variables del backend
-
-Crea `.env` en la raíz del repositorio, al mismo nivel que `backend` y `frontend`:
+Crea o conserva `.env` en la raíz, junto a `backend` y `frontend`:
 
 ```dotenv
-DATABASE_URL=postgresql://USUARIO:CONTRASENA@HOST/BASE_DE_DATOS?sslmode=require
+DATABASE_URL=postgresql://USUARIO:CONTRASENA@HOST/BASE?sslmode=require
 SUPERTOKENS_CONNECTION_URI=https://TU_INSTANCIA_DE_SUPERTOKENS
-SUPERTOKENS_API_KEY=REEMPLAZAR_POR_LA_CLAVE_DE_CORE
+SUPERTOKENS_API_KEY=REEMPLAZAR
+GOOGLE_CLIENT_ID=REEMPLAZAR
+GOOGLE_CLIENT_SECRET=REEMPLAZAR
 API_DOMAIN=http://localhost:8000
 FRONTEND_URL=http://localhost:5173
-CLOUDINARY_CLOUD_NAME=TU_CLOUD_NAME
-CLOUDINARY_API_KEY=TU_API_KEY
-CLOUDINARY_API_SECRET=TU_API_SECRET
-
+CLOUDINARY_CLOUD_NAME=REEMPLAZAR
+CLOUDINARY_API_KEY=REEMPLAZAR
+CLOUDINARY_API_SECRET=REEMPLAZAR
 SMTP_HOST=smtp.example.com
 SMTP_PORT=465
-SMTP_USER=usuario_smtp
-SMTP_PASSWORD=credencial_smtp
+SMTP_USER=REEMPLAZAR
+SMTP_PASSWORD=REEMPLAZAR
 SMTP_FROM=cuenta@example.com
+STRIPE_SECRET_KEY=sk_test_REEMPLAZAR
+STRIPE_WEBHOOK_SECRET=whsec_REEMPLAZAR
 ```
 
-Los valores son ejemplos. `DATABASE_URL` y `SUPERTOKENS_CONNECTION_URI` son obligatorios. Para Core remoto, la API key también es obligatoria. La configuración exige HTTPS para dominios que no sean locales. El tenant utilizado por la aplicación es `public`.
+Son marcadores de ejemplo, no credenciales utilizables. DATABASE_URL, URI de SuperTokens y las variables de Google son obligatorias en la configuración actual; Core remoto requiere API key. El tenant es `public`. Sin claves de Cloudinary fallan las subidas de imágenes; sin SMTP no se entregan enlaces de recuperación; sin Stripe las compras muestran un aviso y las funciones académicas siguen disponibles.
 
-El correo requiere un servidor compatible con SMTP SSL. Si el envío falla, la API mantiene una respuesta genérica para no revelar si una cuenta existe; comprueba la entrega real durante las pruebas.
+No publiques `.env` ni coloques secretos en variables `VITE_*`. PostgreSQL del negocio y SuperTokens tienen responsabilidades distintas. Los antiguos SECRET_KEY y ACCESS_TOKEN_MINUTES del JWT propio no forman parte de la configuración actual.
 
-`SECRET_KEY` y `ACCESS_TOKEN_MINUTES` de la implementación antigua ya no son utilizados por la configuración actual. La política de duración de sesiones debe verificarse en SuperTokens; el frontend no implementa actualmente el aviso previo de cinco minutos.
-
-No publiques `.env` ni pongas secretos en variables `VITE_*`.
-Los valores de Cloudinary se usan exclusivamente para subir imágenes desde
-el backend; sin ellos las demás funciones del catálogo siguen disponibles.
-
-### 4. Iniciar el backend
-
-Desde la raíz:
+Inicia FastAPI desde la raíz:
 
 ```powershell
 cd backend
 ..\.venv\Scripts\python.exe -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Accede a `http://localhost:8000`, `http://localhost:8000/docs` y `http://localhost:8000/db-test`. El inicio de la aplicación prepara los roles en Core, por lo que SuperTokens debe estar disponible.
-
-### 5. Iniciar el frontend
+SuperTokens debe estar disponible al arrancar: la aplicación prepara los roles en Core. Consulta `http://localhost:8000/docs` y `http://localhost:8000/db-test`.
 
 En otra terminal, desde la raíz:
 
@@ -131,65 +116,65 @@ npm ci
 npm run dev
 ```
 
-El frontend utiliza `http://localhost:8000` de forma predeterminada. Puedes declararlo en `frontend/.env.local`:
+En una instalación existente con las dependencias disponibles basta con iniciar Vite. La API predeterminada es `http://localhost:8000`; si necesitas cambiarla configura `VITE_API_URL` en `frontend/.env.local`. Mantén el navegador en `http://localhost:5173` y conserva coherentes API_DOMAIN, FRONTEND_URL y VITE_API_URL. CORS permite el origen exacto de FRONTEND_URL; evita mezclar localhost con 127.0.0.1 en URLs del navegador.
 
-```dotenv
-VITE_API_URL=http://localhost:8000
+## Proveedores externos
+
+**SuperTokens y Google:** conserva la instancia y configuración existentes. Para una instalación nueva configura un cliente OAuth de aplicación web en Google con la URI de retorno `http://localhost:5173/auth/callback/google` y el origen `http://localhost:5173`; carga su ID y secreto en el backend. Comprueba el flujo contra la configuración del proveedor en `backend/app/core/supertokens.py`. La recuperación de contraseña usa el método emailpassword vinculado; una cuenta solo Google debe agregar contraseña desde su sesión antes de usar ese método.
+
+**Cloudinary:** configura cloud name, API key y secret en el backend. La subida de perfil acepta JPG, PNG o WebP hasta 5 MB. Conserva las imágenes públicas actuales del frontend en `frontend/public/images`.
+
+**Correo:** utiliza un servidor compatible con SMTP SSL y los parámetros anteriores. La recuperación responde de forma genérica aunque el correo no exista o no se pueda enviar; verifica la entrega real.
+
+**Stripe:** sigue `docs/CONFIGURAR_STRIPE_PRUEBAS.md`, incluida en el parche. Usa una clave sk_test_ del mismo entorno que la CLI. No necesitas crear manualmente productos en Stripe ni instalar su SDK Python. Instala Stripe CLI, ejecuta `stripe login` y mantén otra terminal abierta con:
+
+```powershell
+stripe listen --events checkout.session.completed,checkout.session.expired --forward-to http://localhost:8000/compras/stripe/webhook
 ```
 
-Abre `http://localhost:5173`. Mantén coherentes `API_DOMAIN`, `VITE_API_URL` y la dirección del navegador. El backend permite en CORS el origen exacto de `FRONTEND_URL`, con credenciales; cambia esa variable si usas otro origen o puerto. Evita mezclar `localhost` y `127.0.0.1` entre la configuración y el navegador.
+Copia el whsec_ mostrado por esa terminal a STRIPE_WEBHOOK_SECRET y reinicia FastAPI. La clave de la CLI puede diferir de la del Dashboard. Los pagos están restringidos a pruebas; la integración no habilita cobros de producción. La API REST fija la versión 2025-02-24.acacia.
 
-## API y sesiones
+## Preparación de escuela y datos de demostración
 
-| Método | Ruta | Función |
-|---|---|---|
-| GET | `/` | Estado básico de la API |
-| GET | `/db-test` | Comprobación de PostgreSQL |
-| POST | `/auth/registro` | Crear identidad, perfil y cliente |
-| POST | `/auth/login` | Crear sesión mediante cookies |
-| POST | `/auth/logout` | Revocar la sesión actual desde el adaptador de la aplicación |
-| POST | `/auth/recuperar-contrasena` | Solicitar enlace por correo |
-| POST | `/auth/restablecer-contrasena` | Consumir token, revocar sesiones y cambiar contraseña |
-| GET | `/usuarios/me` | Consultar perfil |
-| GET | `/usuarios/me/roles` | Consultar roles actuales |
-| GET | `/usuarios/me/permisos` | Consultar permisos actuales |
-| GET | `/usuarios` | Buscar y paginar usuarios; requiere administración |
-| PUT | `/usuarios/{id_usuario}/roles/{rol}` | Asignar rol; requiere administración |
-| DELETE | `/usuarios/{id_usuario}/roles/{rol}` | Retirar rol; requiere administración |
+1. Registra las cuentas de prueba mediante la aplicación. Mantén un administrador vinculado y activo; no se incluye un bootstrap público para elevar privilegios.
+2. Asigna el rol maestro desde Usuarios y roles. El usuario afectado debe volver a iniciar sesión porque cambiar roles revoca sus sesiones.
+3. En Mi cuenta → Administrar escuela → Maestros, completa especialidad y estado del perfil docente.
+4. Crea un periodo abierto y vigente; crea clases con maestro, instrumento, nivel, costo mensual, cupo y horarios. El backend rechaza choques de maestro o salón en periodos que coincidan.
+5. Opcionalmente ejecuta `backend/sql/datos_demo_escuela.sql` tras preparar un maestro y un instrumento activo. Genera un periodo y tres clases ficticias DEMO sin duplicarlas al repetirlo. Revisa sus horarios antes de la presentación.
+6. Crea las inscripciones y compras desde la interfaz; no se inventan usuarios externos ni pagos acreditados mediante SQL.
 
-El frontend inicializa `supertokens-web-js`, envía peticiones con `credentials: "include"` y usa `Session.signOut()` para cerrar sesión mediante el endpoint gestionado por el SDK. Este flujo es distinto del adaptador `/auth/logout`, que también existe en la API.
+La referencia a un instrumento en una clase no descuenta inventario. El costo mensual se conserva en la inscripción, pero el cobro de mensualidades aún no está implementado.
 
-Las rutas personalizadas de `/auth` exigen `rid: session` y validan el origen cuando está presente. Las operaciones privadas verifican la sesión con Core y el perfil local activo. No se utiliza el antiguo contrato de devolver un JWT para guardarlo en `sessionStorage`; el frontend elimina esa clave antigua al iniciar.
+## Navegación principal
 
-Los cambios de roles revocan las sesiones de la cuenta afectada. Un administrador no puede retirarse a sí mismo su rol administrativo desde esta API. La cuenta inicial con privilegios debe aprovisionarse de forma controlada en Core y estar vinculada a un perfil local activo; el repositorio no incluye un comando de bootstrap.
+| Ruta del frontend | Función |
+|---|---|
+| `/` y `/contacto` | Presentación del negocio y contacto |
+| `/inicio` y `/perfil` | Accesos a operaciones y datos personales |
+| `/catalogo` y `/catalogo/:id` | Catálogo y detalle para añadir al carrito |
+| `/carrito` y `/mis-compras` | Compra y consulta del estado |
+| `/escuela` y `/mis-inscripciones` | Oferta académica e inscripciones propias |
+| `/administracion/catalogo` | Administración de instrumentos y categorías |
+| `/administracion/usuarios` | Roles y estado de cuentas |
+| `/administracion/escuela` | Periodos, docentes, clases e inscripciones |
 
-## Organización
+Las operaciones privadas validan sesión con Core, cuenta local activa y permisos en el backend. Conocer una URL no concede autorización. El frontend usa cookies con credentials y el SDK de SuperTokens, no un JWT propio en sessionStorage. La especificación actual de endpoints se consulta en `/docs`.
 
-```text
-backend/
-  main.py
-  app/
-    api/routes/     # Autenticación y usuarios
-    core/           # Configuración, SuperTokens, identidad y permisos
-    db/             # Motor y sesiones SQLModel
-    models/         # Persistencia
-    schemas/        # Entrada y salida de la API
-    services/       # Registro, autenticación y correo
-frontend/
-  src/
-    components/
-    contexts/
-    pages/
-    services/
-    lib/
-DaVinciMusic_schema_canonico.sql
-requirements.txt
-```
+## Reglas de compra y límites del corte
+
+- Una compra pendiente por cliente. Se continúa, concilia o cancela desde Mis compras.
+- El servidor valida stock y precios reales; el total del carrito es estimado. Los detalles conservan los precios de la venta y Checkout conserva un snapshot para reintentos.
+- La venta pendiente reserva existencias descontando disponibilidad bajo bloqueo. El pago no descuenta de nuevo; la expiración/cancelación devuelve la reserva una sola vez.
+- Mientras hay reservas, stock_actual expresa disponibilidad libre; antes de ajustar manualmente existencias físicas, resuelve las compras pendientes para no sobrescribir reservas.
+- El webhook verifica firma, venta, moneda e importe. Los eventos repetidos no acreditan dos veces. Visitar la página de retorno no acredita el pago.
+- Si se interrumpió el reenvío de eventos, Actualizar estado consulta Stripe y concilia. No hay un conciliador periódico propio. Un timeout conserva la reserva hasta poder continuar o cancelar.
+- Checkout utiliza MXN, tarjetas y recogida en tienda. Se admiten entre $10 y $999,999.99 MXN por compra, hasta 30 productos diferentes y 20 unidades por producto. El historial muestra las últimas 100 compras.
+- Cancelar pendiente no equivale a reembolsar una venta pagada. Envíos, reembolsos y facturación fiscal quedan fuera de este corte.
 
 ## Verificación
 
 ```powershell
-# Desde la raíz
+# Desde la raíz, usando el entorno correspondiente
 .\.venv\Scripts\python.exe -m pip check
 
 # Desde frontend
@@ -197,10 +182,17 @@ npm run build
 npm run lint
 ```
 
-Pruebas de integración pendientes de repetir en el entorno configurado: registro y persistencia de identidad/cliente, login, consulta del perfil, logout y rechazo posterior de la sesión, recuperación por correo, rechazo de reutilización del enlace, control de roles y denegación a cuentas inactivas o sin vínculo.
+El parche pasó compilación, lint, sintaxis Python y 11 pruebas con SQL PostgreSQL embebido y proveedores simulados. Las instrucciones de reproducción están en `backend/tests/README.md`; el alcance de esas pruebas está en `docs/VERIFICACION.md`. No equivalen a probar Neon, SuperTokens y Checkout en el entorno final ni a pruebas de carga concurrente.
 
-La revisión que acompaña la retirada del hash comprueba referencias en el código y sintaxis Python; no certifica entrega SMTP, disponibilidad de Core, ejecución PostgreSQL ni una compilación nueva del frontend. El repositorio revisado no contiene una suite automatizada de pruebas. Las auditorías históricas de dependencias no representan una evaluación de seguridad actual.
+Antes de presentar: verifica acceso convencional y Google, recuperación, perfil, baja/reactivación; inscripción y rechazo de duplicados/cupo; baja académica; compra con tarjeta de prueba, confirmación por webhook y cancelación sin devolver stock dos veces. Usa el recorrido de `README_PARCHE_SPRINTS_5_6_3.md`.
 
-## Próximo desarrollo
+## Pendientes acordados
 
-Completar RF-05 (edición de perfil) y después RF-08–19 (categorías e instrumentos). Mantener permisos comprobados en el backend, integridad de datos y mensajes claros. Antes de ventas y escuela, completar las entidades locales de administrador y maestro y sus reglas de negocio.
+- **Ampliar el catálogo de instrumentos**, seleccionando imágenes reutilizables y registrando procedencia/licencia. El parche no agrega 100 productos ni fotografías nuevas.
+- Sprint 4: gestión administrativa de pedidos, proveedores y órdenes/recepción de abastecimiento.
+- Segunda parte del Sprint 6: mensualidades, cobros recurrentes y sincronización de suscripciones.
+- Sprint 7 reducido: asistencia y panel docente; ampliar los accesos básicos del alumno cuando corresponda.
+- Sprint 8 reducido: conteos del administrador y exportaciones CSV.
+- Pospuestos: cupones, reportes detallados, calendario interactivo, reprogramaciones, seguimiento avanzado y producción.
+
+La existencia de tablas pago_clase, proveedor y abastecimiento en el esquema no significa que sus módulos estén disponibles en la web. Las ramas de prácticas de Bases de Datos son trabajos separados y no se integran automáticamente en la aplicación principal.

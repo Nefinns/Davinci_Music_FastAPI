@@ -13,6 +13,11 @@ import Catalogo from "@/pages/Catalogo"
 import DetalleInstrumento from "@/pages/DetalleInstrumento"
 import AdministrarCatalogo from "@/pages/AdministrarCatalogo"
 import Perfil from "@/pages/Perfil"
+import Escuela from '@/pages/Escuela'
+import AdministrarEscuela from '@/pages/AdministrarEscuela'
+import MisInscripciones from '@/pages/MisInscripciones'
+import Carrito from '@/pages/Carrito'
+import MisCompras from '@/pages/MisCompras'
 import Contacto from "@/pages/Contacto"
 
 import { SesionProvider, useSesion } from "@/contexts/SesionContext"
@@ -49,6 +54,11 @@ function RutasAplicacion() {
   return (
     <Routes>
       <Route path="/" element={<InicioPublico />} />
+      <Route path="/escuela" element={<Escuela />} />
+      <Route path="/carrito" element={<Carrito />} />
+      <Route path="/mis-compras" element={<RutaProtegida><MisCompras /></RutaProtegida>} />
+      <Route path="/mis-inscripciones" element={<RutaProtegida><MisInscripciones /></RutaProtegida>} />
+      <Route path="/administracion/escuela" element={<RutaProtegida><AdministrarEscuela /></RutaProtegida>} />
       <Route path="/contacto" element={<Contacto />} />
       <Route path="/catalogo" element={<Catalogo />} />
       <Route path="/catalogo/:id" element={<DetalleInstrumento />} />

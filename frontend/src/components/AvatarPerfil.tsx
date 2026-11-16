@@ -21,7 +21,7 @@ export default function AvatarPerfil({ texto = "Mi perfil" }: { texto?: string }
   }, [])
 
   useEffect(() => {
-    void cargar()
+    void Promise.resolve().then(cargar)
     const actualizar = () => { void cargar() }
     window.addEventListener("davincimusic:perfil-actualizado", actualizar)
     return () => {

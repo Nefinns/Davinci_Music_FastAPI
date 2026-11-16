@@ -70,6 +70,13 @@ export default function Inicio() {
           <BotonGoogle vincular className="mt-8 max-w-sm" />
         )}
         <AgregarContrasena />
+        <nav aria-label="Mis operaciones" className="mt-8 grid gap-3 sm:grid-cols-3">
+          <Link to="/mis-inscripciones" className="rounded-xl border bg-white p-4 text-patina">Mis clases e inscripciones</Link>
+          <Link to="/mis-compras" className="rounded-xl border bg-white p-4 text-patina">Mis compras</Link>
+          <Link to="/carrito" className="rounded-xl border bg-white p-4 text-patina">Mi carrito</Link>
+          <Link to="/escuela" className="rounded-xl border bg-white p-4 text-patina">Explorar clases</Link>
+          {admin&&<Link to="/administracion/escuela" className="rounded-xl bg-patina p-4 text-white">Administrar escuela</Link>}
+        </nav>
         <div className="mt-8 flex flex-wrap gap-4">
           <Link to="/perfil" className="rounded-xl border border-patina px-5 py-3 text-patina">Editar mi perfil</Link>
           <Link to="/catalogo" className="rounded-xl border border-patina px-5 py-3 text-patina">Ver catálogo</Link>
