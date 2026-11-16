@@ -67,7 +67,8 @@ CREATE TABLE instrumento (
     color               VARCHAR(50),             -- opcional
     precio_venta        DECIMAL(10,2) NOT NULL,
     stock_actual        INT NOT NULL DEFAULT 0,
-    activo              BOOLEAN NOT NULL DEFAULT TRUE
+    activo              BOOLEAN NOT NULL DEFAULT TRUE,
+    imagen_public_id    VARCHAR(255)
 );
 
 CREATE TABLE clase (

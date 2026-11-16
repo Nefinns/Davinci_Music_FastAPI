@@ -66,8 +66,13 @@ export default function Inicio() {
           <BotonGoogle vincular className="mt-8 max-w-sm" />
         )}
         <AgregarContrasena />
+        <div className="mt-8 flex flex-wrap gap-4">
+          <Link to="/perfil" className="rounded-xl border border-patina px-5 py-3 text-patina">Editar mi perfil</Link>
+          <Link to="/catalogo" className="rounded-xl border border-patina px-5 py-3 text-patina">Ver catálogo</Link>
+        </div>
 
         {admin && <Link to="/administracion/usuarios" className="mt-8 inline-block rounded-xl bg-patina px-5 py-3 text-white">Administrar usuarios y roles</Link>}
+        {admin && <Link to="/administracion/catalogo" className="ml-3 mt-8 inline-block rounded-xl bg-patina px-5 py-3 text-white">Administrar catálogo</Link>}
       </section>
     </main>
   )

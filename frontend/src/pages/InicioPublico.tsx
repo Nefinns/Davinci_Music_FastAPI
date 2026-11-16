@@ -44,7 +44,7 @@ export default function InicioPublico() {
       ? "#tienda"
       : "/inicio"
     : "/registro"
-  const destinoTienda = autenticado ? "#tienda" : "/registro"
+  const destinoTienda = "/catalogo"
   const destinoEscuela = autenticado ? "#escuela" : "/registro"
 
   return (
@@ -67,15 +67,16 @@ export default function InicioPublico() {
           </Link>
 
           <nav className="hidden items-center gap-6 lg:flex">
-            <a href="#tienda" className="text-sm text-secondary hover:text-patina">
+            <Link to="/catalogo" className="text-sm text-secondary hover:text-patina">
               Tienda
-            </a>
+            </Link>
             <a href="#escuela" className="text-sm text-secondary hover:text-patina">
               Escuela de música
             </a>
             <a href="#nosotros" className="text-sm text-secondary hover:text-patina">
               Nosotros
             </a>
+            <Link to="/contacto" className="text-sm text-secondary hover:text-patina">Contacto</Link>
           </nav>
 
           <div className="flex shrink-0 items-center gap-2">
@@ -166,7 +167,7 @@ export default function InicioPublico() {
                 to={destinoTienda}
                 className="inline-flex items-center gap-2 rounded-full bg-brass px-6 py-3.5 font-semibold text-ebony transition hover:bg-[#d8b45f]"
               >
-                {autenticado ? "Explorar la tienda" : "Comenzar ahora"}
+                Explorar la tienda
                 <ArrowRight size={18} />
               </Link>
 
@@ -358,6 +359,7 @@ export default function InicioPublico() {
             © {new Date().getFullYear()} DaVinciMusic. Todos los derechos
             reservados.
           </p>
+          <Link to="/contacto" className="text-sm text-white/70 hover:text-brass">Contacto</Link>
 
           {!cargando && (
             <div className="flex gap-5 text-sm">

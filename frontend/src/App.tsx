@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
+import type { ReactNode } from "react"
 
 import Usuarios from "@/pages/Usuarios"
 import InicioPublico from "@/pages/InicioPublico"
@@ -8,10 +9,15 @@ import RecuperarContrasena from "@/pages/RecuperarContrasena"
 import Inicio from "@/pages/Inicio"
 import RetornoGoogle from "@/pages/RetornoGoogle"
 import CompletarPerfilGoogle from "@/pages/CompletarPerfilGoogle"
+import Catalogo from "@/pages/Catalogo"
+import DetalleInstrumento from "@/pages/DetalleInstrumento"
+import AdministrarCatalogo from "@/pages/AdministrarCatalogo"
+import Perfil from "@/pages/Perfil"
+import Contacto from "@/pages/Contacto"
 
 import { SesionProvider, useSesion } from "@/contexts/SesionContext"
 
-function RutaProtegida() {
+function RutaProtegida({ children }: { children?: ReactNode }) {
   const { autenticado, cargando, estadoPerfil } = useSesion()
 
   if (cargando) return <p role="status">Verificando sesión...</p>
@@ -24,7 +30,7 @@ function RutaProtegida() {
     return <Navigate to="/" replace />
   }
 
-  return <Inicio />
+  return children ?? <Inicio />
 }
 
 function RutaCompletarPerfil() {
@@ -43,6 +49,9 @@ function RutasAplicacion() {
   return (
     <Routes>
       <Route path="/" element={<InicioPublico />} />
+      <Route path="/contacto" element={<Contacto />} />
+      <Route path="/catalogo" element={<Catalogo />} />
+      <Route path="/catalogo/:id" element={<DetalleInstrumento />} />
       <Route path="/login" element={<InicioSesion />} />
       <Route path="/registro" element={<Registro />} />
       <Route
@@ -68,6 +77,8 @@ function RutasAplicacion() {
         element={<Usuarios />}
       />
       <Route path="/inicio" element={<RutaProtegida />} />
+      <Route path="/perfil" element={<RutaProtegida><Perfil /></RutaProtegida>} />
+      <Route path="/administracion/catalogo" element={<AdministrarCatalogo />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

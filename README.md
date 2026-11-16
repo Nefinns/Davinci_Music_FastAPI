@@ -16,11 +16,18 @@ El código incluye:
 - Consulta del perfil, roles y permisos del usuario autenticado.
 - Administración de roles con búsqueda y paginación de usuarios, confirmación de cambios y revocación de sesiones de la cuenta afectada.
 - Página pública y página de inicio protegida.
+- Edición de datos de perfil autorizados, catálogo público con búsqueda,
+  filtros, paginación y detalle de instrumentos.
+- Administración de categorías, instrumentos y existencias, retirada lógica de
+  productos y subida de imágenes a Cloudinary.
 - Comprobación de disponibilidad de la API y de conexión a PostgreSQL.
 
 La presencia de estas funciones en el código no sustituye las pruebas de integración contra los servicios configurados.
 
-Pendientes: edición del perfil, catálogo e inventario, ventas, abastecimiento, módulos académicos, reportes y despliegue. Las secciones públicas de tienda y escuela son informativas. Las tablas previstas para esos módulos no representan flujos terminados.
+Pendientes: ajustes automáticos de inventario por ventas y abastecimiento, carrito,
+pagos, módulos académicos, reportes y despliegue. La sección de escuela sigue
+siendo informativa. La página Contacto tiene texto base hasta contar con datos
+públicos de la tienda.
 
 ## Stack
 
@@ -66,6 +73,10 @@ Para una base vacía, ejecuta `DaVinciMusic_schema_canonico.sql` desde pgAdmin o
 
 Para una base existente, no ejecutes de nuevo ese script: es un esquema inicial, no una migración. Si la identidad externa ya está incorporada y solo queda la columna del hash antiguo, primero aplica la limpieza del modelo y del servicio. La eliminación física de la columna es un paso separado; no requiere borrar usuarios ni recrear tablas.
 
+Para añadir imágenes al catálogo de una base existente, ejecuta en pgAdmin
+`backend/sql/sprint2_imagen_instrumento.sql`. Agrega una columna opcional a
+`instrumento` y no modifica las filas actuales.
+
 Configura una instancia de SuperTokens Core accesible para el backend. Usa su URI y, para Core remoto, su API key. PostgreSQL del negocio y el almacenamiento administrado por Core tienen responsabilidades distintas.
 
 ### 3. Variables del backend
@@ -78,6 +89,9 @@ SUPERTOKENS_CONNECTION_URI=https://TU_INSTANCIA_DE_SUPERTOKENS
 SUPERTOKENS_API_KEY=REEMPLAZAR_POR_LA_CLAVE_DE_CORE
 API_DOMAIN=http://localhost:8000
 FRONTEND_URL=http://localhost:5173
+CLOUDINARY_CLOUD_NAME=TU_CLOUD_NAME
+CLOUDINARY_API_KEY=TU_API_KEY
+CLOUDINARY_API_SECRET=TU_API_SECRET
 
 SMTP_HOST=smtp.example.com
 SMTP_PORT=465
@@ -93,6 +107,8 @@ El correo requiere un servidor compatible con SMTP SSL. Si el envío falla, la A
 `SECRET_KEY` y `ACCESS_TOKEN_MINUTES` de la implementación antigua ya no son utilizados por la configuración actual. La política de duración de sesiones debe verificarse en SuperTokens; el frontend no implementa actualmente el aviso previo de cinco minutos.
 
 No publiques `.env` ni pongas secretos en variables `VITE_*`.
+Los valores de Cloudinary se usan exclusivamente para subir imágenes desde
+el backend; sin ellos las demás funciones del catálogo siguen disponibles.
 
 ### 4. Iniciar el backend
 

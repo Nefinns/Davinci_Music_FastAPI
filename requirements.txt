@@ -30,6 +30,9 @@ urllib3==2.8.0
 uvicorn==0.53.0
 watchfiles==1.2.0
 websockets==17.1
+cloudinary>=1.40,<2
+Pillow>=10,<13
+python-multipart>=0.0.9,<1
 
 # SuperTokens: dependencias adicionales fijadas; se conservan los pins del stack existente.
 aiohappyeyeballs==2.7.1
