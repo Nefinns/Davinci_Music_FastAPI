@@ -1,0 +1,6 @@
+import { Link } from 'react-router-dom'
+import Marco from '@/components/MarcoOperaciones'
+const opciones = [['Pedidos y reembolsos','/administracion/ventas','Prepara compras, registra entregas y revisa solicitudes.'],['Proveedores y abastecimiento','/administracion/abastecimiento','Gestiona proveedores, órdenes y recepción de existencias.'],['Escuela','/administracion/escuela','Periodos, maestros, clases e inscripciones.'],['Catálogo','/administracion/catalogo','Instrumentos, imágenes, categorías y disponibilidad.'],['Usuarios y roles','/administracion/usuarios','Gestiona el acceso y las bajas de cuentas.']]
+export default function Administracion() {
+  return <Marco titulo="Administración"><p className="mb-6 text-secondary">Elige la operación que necesitas realizar.</p><div className="grid gap-4 md:grid-cols-2">{opciones.map(([nombre,ruta,detalle])=><Link key={ruta} to={ruta} className="rounded-xl border border-patina/30 bg-white p-6 shadow-sm hover:border-patina"><h2 className="mb-2 text-lg font-semibold text-patina">{nombre}</h2><p>{detalle}</p></Link>)}</div></Marco>
+}

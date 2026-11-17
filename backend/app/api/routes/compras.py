@@ -100,6 +100,7 @@ def mias(u:Usuario=Depends(obtener_usuario_actual),db:Session=Depends(obtener_se
     lista=filas(db,'''SELECT v.*,cc.total_centavos FROM venta v JOIN compra_checkout cc USING(id_venta)
       JOIN cliente c USING(id_cliente) WHERE c.id_usuario=:u ORDER BY v.id_venta DESC LIMIT 100''',u=u.id_usuario)
     for v in lista:
+        v['reembolso']=dict(r) if (r:=uno(db,'SELECT estado,motivo,resolucion,stripe_refund_id,actualizado FROM solicitud_reembolso WHERE id_venta=:id',id=v['id_venta'])) else None
         v['detalles']=filas(db,'''SELECT d.*,i.nombre_instrumento FROM detalle_venta d JOIN instrumento i USING(id_instrumento) WHERE id_venta=:id''',id=v['id_venta'])
     return lista
 
@@ -130,6 +131,16 @@ async def webhook(request:Request,db:Session=Depends(obtener_sesion)):
     body=await request.body()
     if len(body)>1024*1024:raise HTTPException(413,'Evento demasiado grande.')
     evento=verificar_evento(body,request.headers.get('stripe-signature',''))
+    if evento.get('type') in {'refund.created','refund.updated','refund.failed'}:
+        from app.services.reembolsos import procesar
+        refund=evento['data']['object']
+        venta=refund.get('metadata',{}).get('id_venta','')
+        if str(venta).isdigit():
+            r=uno(db,'SELECT estado FROM solicitud_reembolso WHERE id_venta=:id',id=int(venta))
+            if r and r['estado'] not in ('Solicitado','Rechazado'):
+                # Leer el estado actual evita retroceder por eventos repetidos o desordenados.
+                procesar(db,int(venta))
+        return {'recibido':True}
     if evento.get('type') not in {'checkout.session.completed','checkout.session.expired'}:return {'recibido':True}
     s=evento['data']['object']
     id=s.get('metadata',{}).get('id_venta','')

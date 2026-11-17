@@ -1,21 +1,13 @@
 import { useEffect, useState } from "react"
-import { consultarMetodosAcceso, puedeAdministrar } from "@/services/usuarios"
+import { consultarMetodosAcceso } from "@/services/usuarios"
 import { Link } from "react-router-dom"
-import { Music2, LogOut } from "lucide-react"
 import { useSesion } from "@/contexts/SesionContext"
 import BotonGoogle from "@/components/BotonGoogle"
 import AgregarContrasena from "@/components/AgregarContrasena"
-import AvatarPerfil from "@/components/AvatarPerfil"
 
 export default function Inicio() {
-  const { cerrarSesion, error } = useSesion()
-  const [admin, setAdmin] = useState(false)
+  const { error } = useSesion()
   const [googleVinculado, setGoogleVinculado] = useState<boolean | null>(null)
-  useEffect(() => {
-    let vigente = true
-    void puedeAdministrar().then(valor => { if (vigente) setAdmin(valor) }).catch(() => { if (vigente) setAdmin(false) })
-    return () => { vigente = false }
-  }, [])
   useEffect(() => {
     let vigente = true
 
@@ -33,25 +25,7 @@ export default function Inicio() {
   }, [])
   return (
     <main className="min-h-screen bg-ivory p-6 md:p-12">
-      <header className="flex items-center justify-between gap-4">
-        <Link to="/" className="flex items-center gap-3">
-          <Music2 className="text-patina" size={28} />
-          <span className="font-heading text-3xl font-bold">
-            DaVinciMusic
-          </span>
-        </Link>
 
-        <div className="flex items-center gap-2">
-          <AvatarPerfil />
-          <button
-            onClick={cerrarSesion}
-            className="inline-flex items-center gap-2 rounded-full border border-ebony/15 px-4 py-2 text-sm font-semibold transition hover:border-patina hover:text-patina"
-          >
-            <LogOut size={16} />
-            Cerrar sesión
-          </button>
-        </div>
-      </header>
       {error && <p role="alert" className="mt-4 text-red-700">{error}</p>}
 
       <section className="mx-auto mt-20 max-w-3xl">
@@ -59,31 +33,21 @@ export default function Inicio() {
           Tu espacio musical
         </p>
         <h1 className="mt-4 font-heading text-5xl font-semibold md:text-6xl">
-          Bienvenido a DaVinciMusic.
+          Mi cuenta
         </h1>
         <p className="mt-5 max-w-xl leading-relaxed text-secondary">
-          Tu acceso se ha completado. Aquí construiremos el espacio personal
-          para las funciones de la tienda y la escuela de música.
+          Administra tus datos personales y tus métodos de acceso. Encontrarás tus compras, clases y áreas de trabajo en la navegación superior.
         </p>
 
         {googleVinculado === false && (
           <BotonGoogle vincular className="mt-8 max-w-sm" />
         )}
         <AgregarContrasena />
-        <nav aria-label="Mis operaciones" className="mt-8 grid gap-3 sm:grid-cols-3">
-          <Link to="/mis-inscripciones" className="rounded-xl border bg-white p-4 text-patina">Mis clases e inscripciones</Link>
-          <Link to="/mis-compras" className="rounded-xl border bg-white p-4 text-patina">Mis compras</Link>
-          <Link to="/carrito" className="rounded-xl border bg-white p-4 text-patina">Mi carrito</Link>
-          <Link to="/escuela" className="rounded-xl border bg-white p-4 text-patina">Explorar clases</Link>
-          {admin&&<Link to="/administracion/escuela" className="rounded-xl bg-patina p-4 text-white">Administrar escuela</Link>}
-        </nav>
         <div className="mt-8 flex flex-wrap gap-4">
           <Link to="/perfil" className="rounded-xl border border-patina px-5 py-3 text-patina">Editar mi perfil</Link>
           <Link to="/catalogo" className="rounded-xl border border-patina px-5 py-3 text-patina">Ver catálogo</Link>
         </div>
 
-        {admin && <Link to="/administracion/usuarios" className="mt-8 inline-block rounded-xl bg-patina px-5 py-3 text-white">Administrar usuarios y roles</Link>}
-        {admin && <Link to="/administracion/catalogo" className="ml-3 mt-8 inline-block rounded-xl bg-patina px-5 py-3 text-white">Administrar catálogo</Link>}
       </section>
     </main>
   )

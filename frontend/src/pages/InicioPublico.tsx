@@ -6,10 +6,8 @@ import {
   GraduationCap,
   Headphones,
   Music,
-  LogOut,
 } from "lucide-react"
 import { useSesion } from "@/contexts/SesionContext"
-import AvatarPerfil from "@/components/AvatarPerfil"
 
 const opciones = [
   {
@@ -49,77 +47,7 @@ export default function InicioPublico() {
 
   return (
     <main className="min-h-screen bg-ivory text-ebony">
-      <header className="border-b border-ebony/10">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-5 lg:px-10">
-          <Link to="/" className="flex shrink-0 items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-sidebar text-brass">
-              <Music2 size={25} />
-            </div>
 
-            <div>
-              <p className="font-heading text-2xl font-bold leading-none">
-                DaVinciMusic
-              </p>
-              <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-secondary">
-                Tienda y escuela musical
-              </p>
-            </div>
-          </Link>
-
-          <nav className="hidden items-center gap-6 lg:flex">
-            <Link to="/catalogo" className="text-sm text-secondary hover:text-patina">
-              Tienda
-            </Link>
-            <Link to="/escuela" className="text-sm text-secondary hover:text-patina">Escuela de música</Link>
-            <a href="#nosotros" className="text-sm text-secondary hover:text-patina">
-              Nosotros
-            </a>
-            <Link to="/contacto" className="text-sm text-secondary hover:text-patina">Contacto</Link>
-          </nav>
-
-          <div className="flex shrink-0 items-center gap-2">
-            {!cargando &&
-              (autenticado ? (
-                <>
-                  {perfilPendiente ? (
-                    <Link
-                      to="/completar-perfil"
-                      className="rounded-full px-4 py-2 text-sm font-semibold hover:bg-black/5"
-                    >
-                      Completar perfil
-                    </Link>
-                  ) : (
-                    <AvatarPerfil />
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => void cerrarSesion()}
-                    className="inline-flex items-center gap-2 rounded-full border border-ebony/15 px-4 py-3 text-sm font-semibold transition hover:border-patina hover:text-patina"
-                  >
-                    <LogOut size={16} />
-                    <span className="hidden sm:inline">Cerrar sesión</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link
-                    to="/login"
-                    className="hidden rounded-full px-4 py-2 text-sm font-semibold transition hover:bg-black/5 sm:inline-flex"
-                  >
-                    Iniciar sesión
-                  </Link>
-                  <Link
-                    to="/registro"
-                    className="inline-flex items-center gap-2 rounded-full bg-patina px-4 py-3 text-sm font-semibold text-white transition hover:bg-sidebar"
-                  >
-                    Crear cuenta
-                    <ArrowRight size={16} />
-                  </Link>
-                </>
-              ))}
-          </div>
-        </div>
-      </header>
 
       {error && (
         <p role="alert" className="mx-auto max-w-7xl px-6 py-3 text-red-700 lg:px-10">

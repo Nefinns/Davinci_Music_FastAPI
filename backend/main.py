@@ -17,6 +17,8 @@ from app.api.routes.usuarios import router as usuarios_router
 from app.api.routes.catalogo import router as catalogo_router
 from app.api.routes.escuela import router as escuela_router
 from app.api.routes.compras import router as compras_router
+from app.api.routes.gestion import router as gestion_router
+from app.api.routes.reembolsos import router as reembolsos_router
 
 @asynccontextmanager
 async def lifespan(app):
@@ -33,6 +35,8 @@ app.include_router(usuarios_router)
 app.include_router(catalogo_router)
 app.include_router(escuela_router)
 app.include_router(compras_router)
+app.include_router(gestion_router)
+app.include_router(reembolsos_router)
 
 @app.get("/")
 def inicio():

@@ -2,7 +2,7 @@
 
 Plataforma en desarrollo para tienda de instrumentos musicales y escuela de música. Implementación propia con FastAPI, PostgreSQL en Neon y React. SuperTokens gestiona identidad, credenciales y sesiones; Cloudinary almacena imágenes. La compra utiliza Stripe Checkout en modo de prueba.
 
-Este README corresponde al ZIP base `(6)(1)` con el parche `DaVinciMusic_Parche_Sprints_5_6_Inscripciones_3_Compra.zip`. La rama de trabajo debe contener esos cambios para que las rutas descritas estén disponibles. La documentación no aplica ni instala el código por sí sola.
+Este README corresponde al ZIP base `(7)(3)` con el penúltimo parche de correcciones y Sprint 4. Para aplicarlo sigue `README_PARCHE_SPRINT4.md`; no ejecutes el esquema canónico sobre una base existente.
 
 ## Estado y alcance actual
 
@@ -14,6 +14,7 @@ Este README corresponde al ZIP base `(6)(1)` con el parche `DaVinciMusic_Parche_
 | Tienda | Categorías, instrumentos, precios, existencias, imágenes, filtros, paginación y detalle público |
 | Escuela — Sprint 5 | Periodos, perfiles docentes de usuarios existentes, clases, niveles, costos, cupos y horarios; catálogo académico público |
 | Inscripciones — Sprint 6, primera parte | Inscripción del cliente, rechazo de duplicados y cupo agotado, consulta personal y baja por administrador |
+| Gestión de tienda — Sprint 4 | Pedidos y entrega en tienda, solicitudes de reembolso total, proveedores y órdenes de abastecimiento con recepción única |
 | Compra — Sprint 3 | Carrito, ventas y detalles, reserva de stock, Checkout de prueba, webhook y conciliación del pago; historial básico |
 | Contenido público | Inicio, Nosotros y Contacto con datos e imágenes de la escuela |
 
@@ -38,7 +39,7 @@ Las dependencias están en `requirements.txt`, `frontend/package.json` y `fronte
 
 El esquema conserva las 16 tablas canónicas de negocio: usuario, cliente, administrador, maestro, categoria_instrumento, instrumento, periodo_academico, clase, horario_clase, inscripcion_clase, pago_clase, venta, detalle_venta, proveedor, orden_abastecimiento y detalle_orden.
 
-Se agregan dos tablas auxiliares: `compra_checkout` (solicitud idempotente, sesión de Stripe, snapshot de artículos y total) y `evento_pago` (eventos procesados). El total actual es **18 tablas**. Se documentan estas extensiones para mantener consistente el modelo con las otras implementaciones del equipo.
+Se agregan dos tablas auxiliares: `compra_checkout` (solicitud idempotente, sesión de Stripe, snapshot de artículos y total) y `evento_pago` (eventos procesados). El penúltimo parche agrega también `solicitud_reembolso` e `historial_venta`. El total actual es **20 tablas**. Se documentan estas extensiones para mantener consistente el modelo con las otras implementaciones del equipo.
 
 `usuario.id_usuario` es la clave local. `identidad_externa` enlaza con el ID principal de SuperTokens; no es un token ni una contraseña. El esquema actual no incluye `contrasena_hash`. SuperTokens administra las credenciales. Las imágenes se referencian mediante `imagen_perfil_public_id` e `imagen_public_id`.
 
@@ -48,7 +49,7 @@ La baja de acceso conserva usuario, relaciones e identidad. Un cliente puede sol
 
 ## PostgreSQL: instalación nueva o actualización
 
-**Base vacía:** ejecuta `DaVinciMusic_schema_canonico.sql` desde pgAdmin o Neon. El esquema actualizado crea las 18 tablas y los índices del parche dentro de una transacción. No requiere ejecutar después las migraciones ya incorporadas. La API no crea tablas al iniciar.
+**Base vacía:** ejecuta `DaVinciMusic_schema_canonico.sql` desde pgAdmin o Neon. El esquema actualizado crea las 20 tablas y los índices del parche dentro de una transacción. No requiere ejecutar después las migraciones ya incorporadas. La API no crea tablas al iniciar.
 
 **Base existente:** conserva todos sus datos y ejecuta únicamente las migraciones que falten:
 
@@ -57,6 +58,7 @@ La baja de acceso conserva usuario, relaciones e identidad. Un cliente puede sol
 | Imagen del instrumento | `backend/sql/sprint2_imagen_instrumento.sql` |
 | Imagen de perfil | `backend/sql/perfil_imagen.sql` |
 | Escuela/inscripciones y compra web | `backend/sql/sprints_5_6_3.sql` |
+| Correcciones, pedidos y reembolsos | `backend/sql/sprint_4_correcciones.sql` |
 
 Si ya ejecutaste esos scripts, reemplazar este README y el archivo canónico es solo una actualización de los archivos del proyecto: **no vuelvas a ejecutar el esquema completo en tu base actual**.
 
@@ -129,7 +131,7 @@ En una instalación existente con las dependencias disponibles basta con iniciar
 **Stripe:** sigue `docs/CONFIGURAR_STRIPE_PRUEBAS.md`, incluida en el parche. Usa una clave sk_test_ del mismo entorno que la CLI. No necesitas crear manualmente productos en Stripe ni instalar su SDK Python. Instala Stripe CLI, ejecuta `stripe login` y mantén otra terminal abierta con:
 
 ```powershell
-stripe listen --events checkout.session.completed,checkout.session.expired --forward-to http://localhost:8000/compras/stripe/webhook
+stripe listen --events checkout.session.completed,checkout.session.expired,refund.created,refund.updated,refund.failed --forward-to http://localhost:8000/compras/stripe/webhook
 ```
 
 Copia el whsec_ mostrado por esa terminal a STRIPE_WEBHOOK_SECRET y reinicia FastAPI. La clave de la CLI puede diferir de la del Dashboard. Los pagos están restringidos a pruebas; la integración no habilita cobros de producción. La API REST fija la versión 2025-02-24.acacia.
@@ -182,17 +184,25 @@ npm run build
 npm run lint
 ```
 
-El parche pasó compilación, lint, sintaxis Python y 11 pruebas con SQL PostgreSQL embebido y proveedores simulados. Las instrucciones de reproducción están en `backend/tests/README.md`; el alcance de esas pruebas está en `docs/VERIFICACION.md`. No equivalen a probar Neon, SuperTokens y Checkout en el entorno final ni a pruebas de carga concurrente.
+El penúltimo parche pasó compilación, lint, sintaxis Python y 20 pruebas con SQL PostgreSQL embebido y proveedores simulados. Las instrucciones de reproducción están en `backend/tests/README.md`; el alcance de esas pruebas está en `docs/VERIFICACION.md`. No equivalen a probar Neon, SuperTokens y Checkout en el entorno final ni a pruebas de carga concurrente.
 
-Antes de presentar: verifica acceso convencional y Google, recuperación, perfil, baja/reactivación; inscripción y rechazo de duplicados/cupo; baja académica; compra con tarjeta de prueba, confirmación por webhook y cancelación sin devolver stock dos veces. Usa el recorrido de `README_PARCHE_SPRINTS_5_6_3.md`.
+Antes de presentar: verifica acceso convencional y Google, recuperación, perfil, baja/reactivación; inscripción y rechazo de duplicados/cupo; baja académica; compra con tarjeta de prueba, confirmación por webhook y cancelación sin devolver stock dos veces. Usa el recorrido de `README_PARCHE_SPRINT4.md`.
 
 ## Pendientes acordados
 
-- **Ampliar el catálogo de instrumentos**, seleccionando imágenes reutilizables y registrando procedencia/licencia. El parche no agrega 100 productos ni fotografías nuevas.
-- Sprint 4: gestión administrativa de pedidos, proveedores y órdenes/recepción de abastecimiento.
+- **Ampliar el catálogo de instrumentos**, seleccionando imágenes reutilizables y registrando procedencia/licencia. El sembrado opcional agrega 20 artículos ficticios DEMO sin fotos; no sustituye la ampliación del catálogo comercial.
 - Segunda parte del Sprint 6: mensualidades, cobros recurrentes y sincronización de suscripciones.
 - Sprint 7 reducido: asistencia y panel docente; ampliar los accesos básicos del alumno cuando corresponda.
 - Sprint 8 reducido: conteos del administrador y exportaciones CSV.
 - Pospuestos: cupones, reportes detallados, calendario interactivo, reprogramaciones, seguimiento avanzado y producción.
 
-La existencia de tablas pago_clase, proveedor y abastecimiento en el esquema no significa que sus módulos estén disponibles en la web. Las ramas de prácticas de Bases de Datos son trabajos separados y no se integran automáticamente en la aplicación principal.
+La tabla pago_clase sigue pendiente de integración con mensualidades. Proveedores y abastecimiento ya están disponibles en Administración. Las ramas de prácticas de Bases de Datos son trabajos separados y no se integran automáticamente en la aplicación principal.
+
+
+## Navegación y operación del Sprint 4
+
+Mi cuenta conserva perfil y métodos de acceso. La cabecera común incluye Mi cuenta junto al avatar y el menú Mi espacio: Mi aprendizaje, Mis compras, Área docente y Administración según roles. Administración agrupa usuarios, catálogo, escuela, pedidos y proveedores/abastecimiento.
+
+La entrega se sigue en `venta.estado_entrega` y no cambia el estado del pago. Las compras siguen siendo para recoger en tienda. Un cliente puede cancelar un pendiente o solicitar reembolso completo de una compra pagada aún no entregada; un administrador debe aprobarlo. Solo la confirmación de Stripe cambia el pago a Reembolsada y restituye inventario. Consulta límites, recuperación, datos demo y pasos completos en `README_PARCHE_SPRINT4.md`.
+
+Los usuarios existentes se conservan. La nueva migración agrega columnas/tablas, sin tocar identidades externas. Las inscripciones anteriores del propio profesor se señalan para revisión administrativa y no se eliminan automáticamente.

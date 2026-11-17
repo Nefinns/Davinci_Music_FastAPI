@@ -68,7 +68,7 @@ class Clase(Datos):
     activa: bool = True
     horarios: list[Horario] = Field(min_length=1,max_length=7)
 
-BASE = '''SELECT c.*, u.nombre||' '||u.apellido_paterno AS maestro,
+BASE = '''SELECT c.*, m.id_usuario AS id_usuario_maestro, u.nombre||' '||u.apellido_paterno AS maestro,
  m.especialidad,i.nombre_instrumento,p.nombre_periodo,p.fecha_inicio,p.fecha_fin,p.estado AS estado_periodo,
  (SELECT count(*) FROM inscripcion_clase x WHERE x.id_clase=c.id_clase AND x.estado_inscripcion='Activa') AS inscritos
  FROM clase c JOIN maestro m USING(id_maestro) JOIN usuario u ON u.id_usuario=m.id_usuario
@@ -149,6 +149,9 @@ def guardar_clase(datos:Clase,id:int|None=None,db:Session=Depends(obtener_sesion
           AND h.hora_inicio<:hf AND h.hora_fin>:hi AND (c.id_maestro=:m OR (:salon<>'' AND lower(h.salon)=lower(:salon))) LIMIT 1''',
           id=id or 0,fin=p['fecha_fin'],inicio=p['fecha_inicio'],dia=h.dia_semana,hf=h.hora_fin,hi=h.hora_inicio,m=datos.id_maestro,salon=h.salon)
         if datos.activa and choque: raise HTTPException(409,'El maestro o salón ya tiene una clase en ese horario.')
+    if id and uno(db,'''SELECT 1 FROM inscripcion_clase x JOIN cliente cl USING(id_cliente)
+        WHERE x.id_clase=:id AND x.estado_inscripcion='Activa' AND cl.id_usuario=:u''',id=id,u=m['id_usuario']):
+        raise HTTPException(409,'El profesor asignado tiene una inscripción activa en este grupo. Revisa y da de baja esa inscripción antes de asignarlo.')
     d=datos.model_dump(exclude={'horarios'})
     if id:
         cols=','.join(f'{k}=:{k}' for k in d)
@@ -168,13 +171,15 @@ def retirar(id:int,db:Session=Depends(obtener_sesion)):
 
 @router.post('/clases/{id}/inscripciones',dependencies=[Depends(requerir_rol('cliente'))],status_code=201)
 def inscribir(id:int,u:Usuario=Depends(obtener_usuario_actual),db:Session=Depends(obtener_sesion)):
-    c=uno(db,'''SELECT c.*,p.estado,p.fecha_fin,m.activo AS docente_activo,u.activo AS usuario_activo
+    c=uno(db,'''SELECT c.*,m.id_usuario AS id_usuario_maestro,p.estado,p.fecha_fin,m.activo AS docente_activo,u.activo AS usuario_activo
       FROM clase c JOIN periodo_academico p USING(id_periodo) JOIN maestro m USING(id_maestro)
       JOIN usuario u ON u.id_usuario=m.id_usuario WHERE id_clase=:id FOR UPDATE OF c''',id=id)
     cliente=uno(db,'SELECT id_cliente FROM cliente WHERE id_usuario=:id',id=u.id_usuario)
     if not cliente:raise HTTPException(409,'No existe tu perfil de cliente.')
     if not c or not c['activa'] or c['estado']!='Abierto' or c['fecha_fin']<date.today() or not c['docente_activo'] or not c['usuario_activo']:
         raise HTTPException(409,'Clase no disponible para inscripción.')
+    if c['id_usuario_maestro']==u.id_usuario:
+        raise HTTPException(409,'Eres el profesor de esta clase. Consúltala en Área docente; no necesitas inscribirte.')
     if uno(db,"SELECT 1 FROM inscripcion_clase WHERE id_clase=:id AND id_cliente=:cl AND estado_inscripcion='Activa'",id=id,cl=cliente['id_cliente']):
         raise HTTPException(409,'Ya estás inscrito en esta clase.')
     n=uno(db,"SELECT count(*) AS n FROM inscripcion_clase WHERE id_clase=:id AND estado_inscripcion='Activa'",id=id)['n']
@@ -185,17 +190,17 @@ def inscribir(id:int,u:Usuario=Depends(obtener_usuario_actual),db:Session=Depend
 
 @router.get('/mis-inscripciones')
 def mis_inscripciones(u:Usuario=Depends(obtener_usuario_actual),db:Session=Depends(obtener_sesion)):
-    lista=filas(db,'''SELECT x.*,c.nombre_clase FROM inscripcion_clase x JOIN cliente cl USING(id_cliente)
-      JOIN clase c USING(id_clase) WHERE cl.id_usuario=:id ORDER BY x.id_inscripcion DESC''',id=u.id_usuario)
+    lista=filas(db,'''SELECT x.*,c.nombre_clase,(m.id_usuario=cl.id_usuario) AS es_profesor FROM inscripcion_clase x JOIN cliente cl USING(id_cliente)
+      JOIN clase c USING(id_clase) JOIN maestro m USING(id_maestro) WHERE cl.id_usuario=:id ORDER BY x.id_inscripcion DESC''',id=u.id_usuario)
     for x in lista:
         x['horarios']=filas(db,'SELECT dia_semana,hora_inicio,hora_fin,salon FROM horario_clase WHERE id_clase=:id ORDER BY id_horario',id=x['id_clase'])
     return lista
 
 @router.get('/inscripciones',dependencies=admin)
 def inscripciones(clase:int|None=None,db:Session=Depends(obtener_sesion)):
-    return filas(db,'''SELECT x.*,c.nombre_clase,u.nombre||' '||u.apellido_paterno AS alumno,u.correo
-      FROM inscripcion_clase x JOIN clase c USING(id_clase) JOIN cliente cl USING(id_cliente)
-      JOIN usuario u ON u.id_usuario=cl.id_usuario WHERE (:clase IS NULL OR x.id_clase=:clase)
+    return filas(db,'''SELECT x.*,c.nombre_clase,u.nombre||' '||u.apellido_paterno AS alumno,u.correo,(m.id_usuario=cl.id_usuario) AS es_profesor
+      FROM inscripcion_clase x JOIN clase c USING(id_clase) JOIN maestro m USING(id_maestro) JOIN cliente cl USING(id_cliente)
+      JOIN usuario u ON u.id_usuario=cl.id_usuario WHERE (CAST(:clase AS INTEGER) IS NULL OR x.id_clase=:clase)
       ORDER BY x.id_inscripcion DESC''',clase=clase)
 
 @router.post('/inscripciones/{id}/baja',dependencies=admin)
@@ -205,3 +210,11 @@ def baja(id:int,db:Session=Depends(obtener_sesion)):
     db.execute(text('SELECT id_clase FROM clase WHERE id_clase=:id FOR UPDATE'),{'id':r['id_clase']})
     db.execute(text("UPDATE inscripcion_clase SET estado_inscripcion='Baja' WHERE id_inscripcion=:id"),{'id':id})
     guardar(db);return {'mensaje':'Baja académica registrada. La cuenta de acceso permanece.'}
+
+@router.get('/docencia',dependencies=[Depends(requerir_rol('maestro'))])
+def docencia(u:Usuario=Depends(obtener_usuario_actual),db:Session=Depends(obtener_sesion)):
+    # El filtro es obligatorio en servidor, aunque el usuario también sea administrador.
+    lista=filas(db,BASE+' WHERE m.id_usuario=:u ORDER BY c.id_clase DESC',u=u.id_usuario)
+    for c in lista:
+        c['horarios']=filas(db,'SELECT * FROM horario_clase WHERE id_clase=:id ORDER BY id_horario',id=c['id_clase'])
+    return lista
