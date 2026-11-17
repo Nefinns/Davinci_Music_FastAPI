@@ -5,6 +5,8 @@ import Cabecera from '@/components/Cabecera'
 import RolesProvider from '@/contexts/RolesProvider'
 import { useRoles } from '@/hooks/useRoles'
 import Administracion from '@/pages/Administracion'
+import Mensualidades from '@/pages/Mensualidades'
+import Panel from '@/pages/Panel'
 import Docencia from '@/pages/Docencia'
 import GestionVentas from '@/pages/GestionVentas'
 import Abastecimiento from '@/pages/Abastecimiento'
@@ -73,6 +75,9 @@ function RutasAplicacion() {
       <Route path="/administracion" element={<RutaProtegida><AccesoRol rol="administrador"><Administracion /></AccesoRol></RutaProtegida>} />
       <Route path="/administracion/ventas" element={<RutaProtegida><AccesoRol rol="administrador"><GestionVentas /></AccesoRol></RutaProtegida>} />
       <Route path="/administracion/abastecimiento" element={<RutaProtegida><AccesoRol rol="administrador"><Abastecimiento /></AccesoRol></RutaProtegida>} />
+      <Route path="/mis-pagos" element={<RutaProtegida><Mensualidades /></RutaProtegida>} />
+      <Route path="/administracion/mensualidades" element={<RutaProtegida><AccesoRol rol="administrador"><Mensualidades admin /></AccesoRol></RutaProtegida>} />
+      <Route path="/administracion/panel" element={<RutaProtegida><AccesoRol rol="administrador"><Panel /></AccesoRol></RutaProtegida>} />
       <Route path="/docencia" element={<RutaProtegida><AccesoRol rol="maestro"><Docencia /></AccesoRol></RutaProtegida>} />
       <Route path="/" element={<InicioPublico />} />
       <Route path="/escuela" element={<Escuela />} />

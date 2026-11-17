@@ -19,12 +19,12 @@ export default function GestionVentas() {
   }
   function buscar(e:FormEvent){e.preventDefault();setFiltro(q.trim());setOffset(0)}
   return <Marco titulo="Pedidos y reembolsos"><p className="mb-5">Compras para recoger en tienda. El pago se confirma con Stripe; aquí gestionas la preparación, la entrega y los reembolsos solicitados.</p>
-    <form onSubmit={buscar} className="mb-5 flex flex-wrap gap-3"><input aria-label="Buscar por folio, cliente o correo" placeholder="Folio, cliente o correo" className="rounded-lg border bg-white p-3" value={q} onChange={e=>setQ(e.target.value)}/><button className={boton}>Buscar</button>
+    <form onSubmit={buscar} className="mb-5 flex flex-wrap gap-3"><input aria-label="Buscar por folio, cliente o correo" placeholder="Nombre completo, correo o #folio" className="rounded-lg border bg-white p-3" value={q} onChange={e=>setQ(e.target.value)}/><button className={boton}>Buscar</button>
       <select aria-label="Estado de pago" className="rounded-lg border bg-white p-3" value={estado} onChange={e=>{setEstado(e.target.value);setOffset(0)}}><option value="">Todos los pagos</option>{['Pendiente','Pagada','Cancelada','Reembolsada','Completada'].map(x=><option key={x}>{x}</option>)}</select>
       <select aria-label="Estado de entrega" className="rounded-lg border bg-white p-3" value={entrega} onChange={e=>{setEntrega(e.target.value);setOffset(0)}}><option value="">Todas las entregas</option>{['Por preparar','Preparando','Lista para recoger','Entregada'].map(x=><option key={x}>{x}</option>)}</select>
     </form>
     {error&&<p role="alert" className="mb-4 text-red-700">{error}</p>}{mensaje&&<p role="status" className="mb-4 text-patina">{mensaje}</p>}{cargando&&<p role="status">Consultando pedidos...</p>}
-    <p className="mb-4">{pagina.total} pedidos encontrados</p><div className="space-y-4">{pagina.items.map(v=>{
+    <p className="mb-2 text-sm text-secondary">Escribe el nombre o folio y pulsa Buscar. Se ignoran tildes y espacios sobrantes; no se corrigen errores de escritura.</p><p className="mb-4">{pagina.total} pedidos encontrados</p><div className="space-y-4">{pagina.items.map(v=>{
       const bloqueado=v.estado_reembolso&&!['Rechazado','Fallido'].includes(v.estado_reembolso)
       return <article key={v.id_venta} className="rounded-xl border bg-white p-6"><h2 className="text-xl font-semibold">Pedido #{v.id_venta} · {v.cliente}</h2><p className="text-sm">{v.correo} · {new Date(v.fecha_venta).toLocaleString('es-MX')}</p><p className="my-3 font-semibold">Pago: {v.estado_venta} · Entrega: {v.estado_entrega} · {dinero(v.total_centavos/100)}</p>
         <ul>{v.detalles.map(d=><li key={d.id_instrumento}>{d.cantidad} × {d.nombre_instrumento} · {dinero(d.precio_unitario)} c/u</li>)}</ul>

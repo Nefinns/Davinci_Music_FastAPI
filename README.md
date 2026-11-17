@@ -1,3 +1,5 @@
+> **Actualización final:** sobre el ZIP (8) se implementan mensualidades recurrentes, asistencia y panel/CSV. Sigue `README_PARCHE_FINAL.md` y aplica `backend/sql/sprints_6_7_8.sql` sobre la base existente. El esquema canónico completo es solo para una base vacía y ahora contiene 23 tablas. Las notas de etapas anteriores se conservan debajo como referencia; la guía final prevalece respecto a mensualidades, asistencia y paneles.
+
 # DaVinciMusic
 
 Plataforma en desarrollo para tienda de instrumentos musicales y escuela de música. Implementación propia con FastAPI, PostgreSQL en Neon y React. SuperTokens gestiona identidad, credenciales y sesiones; Cloudinary almacena imágenes. La compra utiliza Stripe Checkout en modo de prueba.

@@ -21,6 +21,7 @@ export default function Cabecera() {
             <details key={pathname} className="relative"><summary className="cursor-pointer rounded-lg border border-patina/30 px-3 py-2 text-sm">Mi espacio</summary>
               <div className="absolute right-0 z-50 mt-2 grid w-56 gap-1 rounded-xl border border-ebony/10 bg-white p-3 shadow-xl">
                 {roles.includes('cliente') && <NavLink className={enlace} to="/mis-inscripciones">Mi aprendizaje</NavLink>}
+                <NavLink className={enlace} to="/mis-pagos">Mis mensualidades</NavLink>
                 <NavLink className={enlace} to="/mis-compras">Mis compras</NavLink>
                 {roles.includes('maestro') && <NavLink className={enlace} to="/docencia">Área docente</NavLink>}
                 {roles.includes('administrador') && <NavLink className={enlace} to="/administracion">Administración</NavLink>}
