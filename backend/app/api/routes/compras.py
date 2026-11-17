@@ -131,6 +131,19 @@ async def webhook(request:Request,db:Session=Depends(obtener_sesion)):
     body=await request.body()
     if len(body)>1024*1024:raise HTTPException(413,'Evento demasiado grande.')
     evento=verificar_evento(body,request.headers.get('stripe-signature',''))
+    # Facturas/suscripciones escolares se concilian por API; no interfieren con ventas.
+    tipo=evento.get('type','');obj=evento.get('data',{}).get('object',{})
+    escolar=(tipo.startswith('invoice.') or tipo.startswith('customer.subscription.') or
+             (tipo.startswith('checkout.session.') and obj.get('metadata',{}).get('id_inscripcion')))
+    if escolar:
+        from app.services.mensualidades import sincronizar
+        sid=(obj.get('subscription') or obj.get('parent',{}).get('subscription_details',{}).get('subscription')) if tipo.startswith('invoice.') else obj.get('id') if tipo.startswith('customer.subscription.') else None
+        registro=uno(db,'SELECT id_inscripcion FROM suscripcion_escuela WHERE stripe_subscription_id=:sid',sid=sid) if sid else None
+        id=registro['id_inscripcion'] if registro else obj.get('metadata',{}).get('id_inscripcion')
+        if id and str(id).isdigit():
+            if uno(db,'SELECT 1 FROM suscripcion_escuela WHERE id_inscripcion=:i',i=int(id)):
+                sincronizar(db,int(id));db.commit()
+        return {'recibido':True}
     if evento.get('type') in {'refund.created','refund.updated','refund.failed'}:
         from app.services.reembolsos import procesar
         refund=evento['data']['object']

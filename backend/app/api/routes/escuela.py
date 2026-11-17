@@ -186,7 +186,7 @@ def inscribir(id:int,u:Usuario=Depends(obtener_usuario_actual),db:Session=Depend
     if n>=c['cupo_maximo']:raise HTTPException(409,'No hay cupo disponible.')
     r=uno(db,'''INSERT INTO inscripcion_clase(id_cliente,id_clase,costo_mensual_acordado)
       VALUES(:cl,:id,:costo) RETURNING id_inscripcion''',cl=cliente['id_cliente'],id=id,costo=c['costo_mensual'])
-    guardar(db);return {'id_inscripcion':r['id_inscripcion'],'mensaje':'Inscripción registrada. La mensualidad se habilitará en el siguiente módulo.'}
+    guardar(db);return {'id_inscripcion':r['id_inscripcion'],'mensaje':'Inscripción registrada. Contrata la mensualidad desde Mis mensualidades.'}
 
 @router.get('/mis-inscripciones')
 def mis_inscripciones(u:Usuario=Depends(obtener_usuario_actual),db:Session=Depends(obtener_sesion)):
@@ -208,6 +208,8 @@ def baja(id:int,db:Session=Depends(obtener_sesion)):
     r=uno(db,"SELECT id_clase FROM inscripcion_clase WHERE id_inscripcion=:id",id=id)
     if not r:raise HTTPException(404,'Inscripción inexistente.')
     db.execute(text('SELECT id_clase FROM clase WHERE id_clase=:id FOR UPDATE'),{'id':r['id_clase']})
+    if uno(db,"SELECT 1 FROM suscripcion_escuela WHERE id_inscripcion=:id AND estado NOT IN ('canceled','incomplete_expired','Expirada')",id=id):
+        raise HTTPException(409,'Detén y sincroniza primero el cobro recurrente desde Mensualidades. La baja no debe dejar una suscripción cobrando.')
     db.execute(text("UPDATE inscripcion_clase SET estado_inscripcion='Baja' WHERE id_inscripcion=:id"),{'id':id})
     guardar(db);return {'mensaje':'Baja académica registrada. La cuenta de acceso permanece.'}
 

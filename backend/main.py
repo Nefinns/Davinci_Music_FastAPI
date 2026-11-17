@@ -34,6 +34,10 @@ app.include_router(auth_router)
 app.include_router(usuarios_router)
 app.include_router(catalogo_router)
 app.include_router(escuela_router)
+from app.api.routes.academico_final import router as final_router
+from app.api.routes.panel import router as panel_router
+app.include_router(final_router)
+app.include_router(panel_router)
 app.include_router(compras_router)
 app.include_router(gestion_router)
 app.include_router(reembolsos_router)

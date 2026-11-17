@@ -127,13 +127,25 @@ def procesar_orden(id:int,accion:Literal['recibir','cancelar'],db:Session=Depend
 @router.get('/ventas')
 def ventas(q:str=Query('',max_length=100),estado:str=Query('',max_length=30),entrega:str=Query('',max_length=30),
            offset:int=Query(0,ge=0),db:Session=Depends(obtener_sesion)):
-    where=''' FROM venta v JOIN cliente c USING(id_cliente) JOIN usuario u USING(id_usuario)
+    import unicodedata
+    q=' '.join(q.split())
+    folio=q.lstrip('#').strip()
+    # Cada palabra debe aparecer en nombre completo o correo. Normalizar tildes sin extensión SQL.
+    normal=lambda v: ''.join(c for c in unicodedata.normalize('NFD',v.lower()) if unicodedata.category(c)!='Mn')
+    tokens=normal(q).split()
+    nombre="translate(lower(concat_ws(' ',u.nombre,u.apellido_paterno,u.apellido_materno,u.correo)), 'áéíóúüñ', 'aeiouun')"
+    condiciones=[];args=dict(e=estado,entrega=entrega)
+    for j,t in enumerate(tokens):
+        args['t'+str(j)]='%'+t.replace('!','!!').replace('%','!%').replace('_','!_')+'%'
+        condiciones.append(nombre+f" LIKE :t{j} ESCAPE '!' ")
+    texto=' AND '.join(condiciones) if condiciones else 'TRUE'
+    args['folio']=folio if folio.isdigit() else ''
+    where=""" FROM venta v JOIN cliente c USING(id_cliente) JOIN usuario u USING(id_usuario)
       LEFT JOIN compra_checkout cc USING(id_venta) LEFT JOIN solicitud_reembolso r USING(id_venta)
       WHERE (:e='' OR v.estado_venta=:e) AND (:entrega='' OR v.estado_entrega=:entrega)
-      AND (:q='' OR CAST(v.id_venta AS TEXT)=:q OR u.nombre ILIKE :busca OR u.apellido_paterno ILIKE :busca OR u.correo ILIKE :busca)'''
-    args=dict(e=estado,entrega=entrega,q=q,busca='%'+q+'%')
+      AND (CAST(v.id_venta AS TEXT)=:folio OR ("""+texto+"))"
     total=uno(db,'SELECT count(*) AS n'+where,**args)['n']
-    lista=filas(db,'''SELECT v.*,u.nombre||' '||u.apellido_paterno AS cliente,u.correo,
+    lista=filas(db,'''SELECT v.*,concat_ws(' ',u.nombre,u.apellido_paterno,u.apellido_materno) AS cliente,u.correo,
       COALESCE(cc.total_centavos,(SELECT sum(d.cantidad*d.precio_unitario*100) FROM detalle_venta d WHERE d.id_venta=v.id_venta)) AS total_centavos,
       r.estado AS estado_reembolso,r.motivo,r.resolucion,r.stripe_refund_id'''+where+' ORDER BY v.id_venta DESC LIMIT 20 OFFSET :offset',offset=offset,**args)
     for v in lista:
