@@ -17,11 +17,19 @@ from app.models.usuario import Usuario
 from app.schemas.usuario import (UsuarioRegistro, UsuarioRespuesta, UsuarioLogin,
                                  SolicitudRecuperacionContrasena, RestablecerContrasena)
 from app.services.usuario import registrar_usuario, autenticar_usuario, buscar_por_correo
-from app.services.correo import enviar_correo_recuperacion
 
 from supertokens_python.asyncio import get_user
 from app.schemas.usuario import UsuarioRegistroGoogle
 from app.services.usuario import completar_registro_google
+from urllib.parse import urlencode
+
+from supertokens_python.recipe.emailpassword.asyncio import (
+    send_email as enviar_email_supertokens,
+)
+from supertokens_python.recipe.emailpassword.types import (
+    PasswordResetEmailTemplateVars,
+    PasswordResetEmailTemplateVarsUser,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -192,15 +200,26 @@ async def recuperar(
 
                 if isinstance(resultado, CreateResetPasswordOkResult):
                     try:
-                        await run_in_threadpool(
-                            enviar_correo_recuperacion,
-                            usuario.correo,
-                            resultado.token,
+                        enlace = (
+                            f"{FRONTEND_URL.rstrip('/')}/restablecer-contrasena?"
+                            +urlencode({"token":resultado.token})
                         )
+
+                        await enviar_email_supertokens(
+                            PasswordResetEmailTemplateVars(
+                                user=PasswordResetEmailTemplateVarsUser(
+                                    user_id=cuenta.id,
+                                    recipe_user_id=metodo.recipe_user_id,
+                                    email=usuario.correo
+                                ),
+                                password_reset_link=enlace,
+                                tenant_id=TENANT_ID,
+                            )
+                        )
+                           
                     except Exception:
                         logger.error(
-                            "No se pudo enviar un correo de recuperación; "
-                            "comprobar SMTP."
+                            "No se pudo completar el envío del correo de recuperación."
                         )
 
     # No revela si la cuenta existe o qué métodos de acceso tiene.
@@ -263,6 +282,5 @@ async def restablecer(
             400,
             "No se pudo cambiar la contraseña. Solicita otro enlace.",
         )
-
-
+    
     return {"mensaje": "Contraseña actualizada. Inicia sesión nuevamente."}

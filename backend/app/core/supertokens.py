@@ -62,7 +62,7 @@ def disable_emailpassword_apis(original):
         should_try_linking_with_session_user,
         api_options,
         user_context,
-    ):   
+    ):
         if (
             session is None
             or tenant_id != TENANT_ID
@@ -190,7 +190,7 @@ def tolerar_desfase_google(provider: Provider) -> Provider:
                 if isinstance(iat, (int, float)) and not isinstance(iat, bool):
                     espera = iat - time.time()
 
-                    if 0 < espera <= 2:
+                    if 0 < espera <= 5:
                         await asyncio.sleep(espera + 0.1)
             except (jwt.InvalidTokenError, ValueError, TypeError):
                 # SuperTokens hará la validación y rechazará el token inválido.
@@ -255,12 +255,12 @@ def tolerar_desfase_sesion(original: RecipeInterface) -> RecipeInterface:
                 raise error
 
             espera = iat - time.time()
-            if not 0 < espera <= 2:
+            if not 0 < espera <= 5:
                 raise error
 
             await asyncio.sleep(espera + 0.1)
             return await verificar()
-
+        
     original.get_session = obtener_sesion
     return original
 
